@@ -1,0 +1,378 @@
+{
+  "inventory": {
+    "Blast Machine": {
+      "settings": {
+        "extras_mode": "Single",
+        "separator": ""
+      },
+      "fields": {
+        "Capacity": {
+          "order": 2,
+          "options": [
+            {
+              "code": "20",
+              "name": "20 LTR (1080)",
+              "order": 1
+            },
+            {
+              "code": "30",
+              "name": "30 LTR (1090)",
+              "order": 2
+            },
+            {
+              "code": "50",
+              "name": "50 LTR (14160)",
+              "order": 3
+            },
+            {
+              "code": "100",
+              "name": "100 LTR (20300)",
+              "order": 4
+            },
+            {
+              "code": "200",
+              "name": "200 LTR (24650)",
+              "order": 5
+            },
+            {
+              "code": "300",
+              "name": "300 LTR (24800)",
+              "order": 6
+            }
+          ]
+        },
+        "Configuration": {
+          "order": 3,
+          "options": [
+            {
+              "code": "M",
+              "name": "Manual",
+              "order": 1
+            },
+            {
+              "code": "A",
+              "name": "Automatic",
+              "order": 2
+            },
+            {
+              "code": "C",
+              "name": "Contractor",
+              "order": null
+            }
+          ]
+        },
+        "Certification": {
+          "order": 4,
+          "options": [
+            {
+              "code": "S",
+              "name": "Standard ",
+              "order": 1.0
+            },
+            {
+              "code": "ST",
+              "name": "Standard Third Party",
+              "order": 2.0
+            },
+            {
+              "code": "U",
+              "name": "ASME Certified",
+              "order": 3.0
+            },
+            {
+              "code": "P",
+              "name": "PED Certified",
+              "order": 4.0
+            },
+            {
+              "code": null,
+              "name": null,
+              "order": NaN
+            }
+          ]
+        },
+        "Valve": {
+          "order": 5,
+          "options": [
+            {
+              "code": "F",
+              "name": "Flat Sand Valve",
+              "order": 1
+            },
+            {
+              "code": "G",
+              "name": "Grit Valve",
+              "order": 2
+            },
+            {
+              "code": "M",
+              "name": "Micro Valve",
+              "order": 3
+            },
+            {
+              "code": "T",
+              "name": "TV1",
+              "order": 4
+            },
+            {
+              "code": "S",
+              "name": "Saunder",
+              "order": 5
+            }
+          ]
+        },
+        "Screen/Cover": {
+          "order": 6,
+          "options": [
+            {
+              "code": "0",
+              "name": "No Screen + Cover",
+              "order": 1
+            },
+            {
+              "code": "1",
+              "name": "Screen + Cover",
+              "order": 2
+            },
+            {
+              "code": "2",
+              "name": "Cover Only",
+              "order": 3
+            },
+            {
+              "code": "3",
+              "name": "Screen Only",
+              "order": 4
+            }
+          ]
+        },
+        "Machine": {
+          "order": 1,
+          "options": [
+            {
+              "code": "BL",
+              "name": "Blastline Blast Machine",
+              "order": "1"
+            },
+            {
+              "code": "NB",
+              "name": "Nova",
+              "order": "2"
+            }
+          ]
+        }
+      },
+      "extras": [
+        {
+          "code": "01",
+          "name": "Moisture Seperator",
+          "order": 1.0
+        },
+        {
+          "code": "02",
+          "name": "PG + RV",
+          "order": 2.0
+        },
+        {
+          "code": "03",
+          "name": "MS + PG + RV",
+          "order": 3.0
+        },
+        {
+          "code": "04",
+          "name": "Popup Umberlla Only",
+          "order": 4.0
+        },
+        {
+          "code": "05",
+          "name": "Umberlla + MS + PG + RV",
+          "order": 5.0
+        },
+        {
+          "code": "06",
+          "name": "RV Only",
+          "order": 6.0
+        },
+        {
+          "code": "07",
+          "name": "Umberella + PG + RV",
+          "order": 7.0
+        }
+      ]
+    },
+    "Air Receiver": {
+      "settings": {
+        "extras_mode": "Single",
+        "separator": ""
+      },
+      "fields": {
+        "Machine": {
+          "order": 1,
+          "options": [
+            {
+              "code": "AR",
+              "name": "Air Receiver",
+              "order": 1
+            }
+          ]
+        },
+        "Capacity": {
+          "order": 2,
+          "options": [
+            {
+              "code": "100",
+              "name": "100 Ltr",
+              "order": 1
+            },
+            {
+              "code": "200",
+              "name": "200 Ltr",
+              "order": 2
+            },
+            {
+              "code": "500",
+              "name": "500 Ltr",
+              "order": 3
+            },
+            {
+              "code": "1000",
+              "name": "1000 Ltr",
+              "order": 4
+            },
+            {
+              "code": "2000",
+              "name": "2000 Ltr",
+              "order": 5
+            }
+          ]
+        },
+        "Certification": {
+          "order": 3,
+          "options": [
+            {
+              "code": "S",
+              "name": "Standard",
+              "order": 1
+            },
+            {
+              "code": "ST",
+              "name": "Standard 3rd Party",
+              "order": 2
+            },
+            {
+              "code": "P",
+              "name": "PED",
+              "order": 3
+            },
+            {
+              "code": "U",
+              "name": "ASME",
+              "order": 4
+            },
+            {
+              "code": "UD",
+              "name": "DOSH",
+              "order": 5
+            }
+          ]
+        },
+        "Type": {
+          "order": 4,
+          "options": [
+            {
+              "code": "V",
+              "name": "Vertical",
+              "order": 1
+            },
+            {
+              "code": "H",
+              "name": "Horizontal",
+              "order": null
+            },
+            {
+              "code": null,
+              "name": null,
+              "order": null
+            }
+          ]
+        },
+        "Stacking": {
+          "order": 5,
+          "options": [
+            {
+              "code": "0",
+              "name": "Not Stackable",
+              "order": null
+            },
+            {
+              "code": "1",
+              "name": "Stackable",
+              "order": null
+            }
+          ]
+        },
+        "Inlet": {
+          "order": 6,
+          "options": [
+            {
+              "code": "S",
+              "name": "Single Inlet",
+              "order": 1
+            },
+            {
+              "code": "D",
+              "name": "Double Inlet",
+              "order": 2
+            }
+          ]
+        },
+        "Outlet Configuration": {
+          "order": 8,
+          "options": [
+            {
+              "code": "S1",
+              "name": "Configuration 1",
+              "order": 1
+            },
+            {
+              "code": "S2",
+              "name": "Configuration 2",
+              "order": 2
+            },
+            {
+              "code": "S3",
+              "name": "Configuration 3",
+              "order": 3
+            }
+          ]
+        },
+        "Outlet": {
+          "order": 7,
+          "options": [
+            {
+              "type": "text",
+              "code": "",
+              "name": ""
+            }
+          ]
+        },
+        "Other customization / Client": {
+          "order": 9,
+          "options": [
+            {
+              "code": "NB",
+              "name": "NB",
+              "order": 1
+            },
+            {
+              "code": "EC",
+              "name": "EC",
+              "order": 2
+            }
+          ]
+        }
+      },
+      "extras": []
+    }
+  }
+}
