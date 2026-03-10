@@ -45,14 +45,34 @@ class GithubStorage:
         self.can_connect = True  # Always true for disk storage
 
     def load(self):
-        """Load configuration data from disk."""
-        if not os.path.exists(self.path):
-            return {"inventory": {}}
-        try:
-            with open(self.path, "r", encoding="utf-8") as f:
-                return json.load(f)
-        except Exception:
-            return {"inventory": {}}
+        """
+        Load configuration data from disk.
+        If no data file exists yet, seed from bundled data.json (if present).
+        """
+        # If primary data file exists, load it
+        if os.path.exists(self.path):
+            try:
+                with open(self.path, "r", encoding="utf-8") as f:
+                    return json.load(f)
+            except Exception:
+                return {"inventory": {}}
+
+        # Seed from repo data.json on first run (e.g. fresh Render deploy)
+        seed_path = os.path.join(os.path.dirname(__file__), "data.json")
+        if os.path.exists(seed_path):
+            try:
+                with open(seed_path, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                # Persist seeded data to primary storage path
+                os.makedirs(os.path.dirname(self.path), exist_ok=True)
+                with open(self.path, "w", encoding="utf-8") as out_f:
+                    json.dump(data, out_f, indent=2)
+                return data
+            except Exception:
+                return {"inventory": {}}
+
+        # Fallback if nothing available
+        return {"inventory": {}}
 
     def save(self, data):
         """Save configuration data to disk."""
