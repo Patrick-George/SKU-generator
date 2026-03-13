@@ -3,4 +3,5 @@ pandas
 qrcode
 pillow
 requests
+anthropic
 

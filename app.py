@@ -6,6 +6,7 @@ import requests
 import base64
 import qrcode
 import os
+import anthropic
 from io import BytesIO
 from PIL import Image
 
@@ -83,6 +84,38 @@ class GithubStorage:
             return True
         except Exception:
             return False
+
+# ==================================================
+# AI DESCRIPTION
+# ==================================================
+ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
+
+def generate_product_description(breakdown_items, category_name, sku):
+    """Generate a natural language product description from SKU breakdown using Claude."""
+    if not ANTHROPIC_API_KEY:
+        return None, "ANTHROPIC_API_KEY environment variable not set."
+
+    parts = "\n".join([f"- {item['name']} (code: {item['code']})" for item in breakdown_items])
+    prompt = (
+        f"You are a product copywriter for Blastline India, an industrial equipment company. "
+        f"Write a concise, professional 2-3 sentence product description based on these specifications.\n\n"
+        f"Product Category: {category_name}\n"
+        f"SKU: {sku}\n"
+        f"Specifications:\n{parts}\n\n"
+        f"Write a natural, readable description suitable for a product catalog. "
+        f"Do not use bullet points. Do not repeat the SKU code."
+    )
+
+    try:
+        client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
+        message = client.messages.create(
+            model="claude-3-5-haiku-latest",
+            max_tokens=200,
+            messages=[{"role": "user", "content": prompt}]
+        )
+        return message.content[0].text, None
+    except Exception as e:
+        return None, str(e)
 
 # ==================================================
 # HELPERS
@@ -745,6 +778,34 @@ def home():
                 breakdown_html += "</div>"
                 st.markdown(breakdown_html, unsafe_allow_html=True)
                 
+                st.markdown("<div style='margin-top: 15px;'></div>", unsafe_allow_html=True)
+
+                # AI Product Description
+                if ANTHROPIC_API_KEY and breakdown_items:
+                    if st.button("✨ Generate Description", key="gen_desc", use_container_width=False):
+                        with st.spinner("Generating..."):
+                            desc, err = generate_product_description(breakdown_items, cat, sku)
+                            if desc:
+                                st.session_state["ai_description"] = desc
+                            else:
+                                st.error(f"Failed: {err}")
+                    
+                    if st.session_state.get("ai_description"):
+                        st.markdown(
+                            f"<div style='background: #f0faf0; border: 1px solid #c3e6cb; border-radius: 8px; "
+                            f"padding: 12px 16px; font-size: 13px; color: #333; line-height: 1.6; margin: 8px 0;'>"
+                            f"{st.session_state['ai_description']}</div>",
+                            unsafe_allow_html=True
+                        )
+                        copy_desc_html = f"""
+                        <button onclick="navigator.clipboard.writeText(`{st.session_state['ai_description'].replace('`', '')}`); this.innerText='✓ Copied'" 
+                            style="background: #e8f4fd; border: 1px solid #c5dff0; border-radius: 6px; 
+                            padding: 5px 12px; cursor: pointer; color: #1a73e8; font-size: 11px; margin-top: 4px;">
+                            📋 Copy Description
+                        </button>
+                        """
+                        st.components.v1.html(copy_desc_html, height=40)
+
                 st.markdown("<div style='margin-top: 15px;'></div>", unsafe_allow_html=True)
                 
                 # Generated QR Code Section - larger subheading, dynamic width
