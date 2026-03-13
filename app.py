@@ -119,25 +119,50 @@ def generate_product_description(breakdown_items, category_name, sku):
         return None, str(e)
 
 
-def generate_product_name_and_description(breakdown_items, category_name, sku):
-    """Generate both a product item name and description from SKU breakdown using Claude."""
+def generate_product_name_and_description(breakdown_items, category_name, sku, extras_items=None):
+    """Generate both a tally item name and item description from SKU breakdown using Claude."""
     if not ANTHROPIC_API_KEY:
         return None, None, "ANTHROPIC_API_KEY environment variable not set."
 
     parts = "\n".join([f"- {item['name']} (code: {item['code']})" for item in breakdown_items])
+    extras_str = ""
+    if extras_items:
+        extras_str = "\nExtras selected:\n" + "\n".join(
+            [f"- {item['name']} (code: {item['code']})" for item in extras_items]
+        )
+
     prompt = (
-        f"You are a product copywriter for Blastline India, an industrial equipment company.\n\n"
+        f"You are generating item names for Blastline India's inventory/Tally system.\n\n"
         f"Product Category: {category_name}\n"
         f"SKU: {sku}\n"
-        f"Specifications:\n{parts}\n\n"
-        f"Generate TWO things:\n"
-        f"1. ITEM NAME: A short, clear product name (e.g. 'Blastline 20L Manual Blast Machine - Standard'). "
-        f"Keep it under 10 words. Include key specs like capacity and type.\n"
-        f"2. DESCRIPTION: A concise, professional 2-3 sentence product description suitable for a product catalog. "
-        f"Do not use bullet points. Do not repeat the SKU code.\n\n"
-        f"Output EXACTLY in this format (no extra text):\n"
-        f"NAME: <the item name>\n"
-        f"DESCRIPTION: <the description>"
+        f"Specifications:\n{parts}{extras_str}\n\n"
+        f"Generate TWO things based on these rules:\n\n"
+        f"1. ITEM TALLY NAME: A short comma-separated abbreviated name for Tally/inventory.\n"
+        f"   Rules:\n"
+        f"   - Start with category abbreviation (e.g. BLBM for Blastline Blast Machine)\n"
+        f"   - Then capacity + config code (e.g. 200A for 200ltr Automatic, 20M for 20ltr Manual)\n"
+        f"   - Then certification abbreviation if any (e.g. T for Third-party Tested, ST for Standard)\n"
+        f"   - Then valve abbreviation (e.g. SV=Sand Valve, MV=Micro Valve, GV=Grit Valve, TV=Thompson Valve, BV=Ball Valve, MS=Mini Sand Valve, MG=Mini Grit Valve)\n"
+        f"   - Then inlet/outlet combo number if applicable\n"
+        f"   - Separate base specs with commas\n"
+        f"   - If extras selected, add ' + ' then extras codes comma-separated\n"
+        f"   - If screen/cover selected, add ' + Fittings'\n"
+        f"   - Keep it SHORT - all abbreviations\n"
+        f"   Example: BLBM,200A,T,SV,1 + MS,PG,RV + Fittings\n\n"
+        f"2. ITEM DESCRIPTION: A single-line expanded but still concise description.\n"
+        f"   Rules:\n"
+        f"   - Start with full category name (e.g. 'Blastline Blast Machine')\n"
+        f"   - Then capacity in litres + config name (e.g. '200ltr Automatic')\n"
+        f"   - Certification in parentheses if any (e.g. '(Third Party Tested)')\n"
+        f"   - Use 'w/' for 'with' (e.g. 'w/ Flat Sand Valve')\n"
+        f"   - Screen/Cover status (e.g. 'w/ Screen + Cover' or 'w/ No Screen + No Cover')\n"
+        f"   - If extras, add '+ Extras: codes' (e.g. '+ Extras: MS,PG,RV')\n"
+        f"   - Add '+ Fittings' at end if screen/cover present\n"
+        f"   - Keep it to ONE line, use abbreviations where natural\n"
+        f"   Example: Blastline Blast Machine 200ltr Automatic (Third Party Tested) w/ Flat Sand Valve w/ Screen + Cover + Extras: MS,PG,RV + Fittings\n\n"
+        f"Output EXACTLY in this format (no extra text, no markdown):\n"
+        f"NAME: <the tally name>\n"
+        f"DESCRIPTION: <the item description>"
     )
 
     try:
@@ -726,14 +751,16 @@ def home():
     extras_codes = "".join([c["code"] for c in chosen])
     sku = base + (sep if base and extras_codes else "") + extras_codes
     
-    # Build breakdown items as list of (code, name) tuples - filter out None/empty values
+    # Build breakdown items (base fields only) and extras items separately
     breakdown_items = []
     for k in ordered_fields(fields):
         if sel.get(k) and sel[k].get("code") and sel[k].get("name"):
             breakdown_items.append({"code": str(sel[k]["code"]), "name": str(sel[k]["name"])})
+    extras_items = []
     for c in chosen:
         if c.get("code") and c.get("name"):
-            breakdown_items.append({"code": str(c["code"]), "name": str(c["name"])})
+            extras_items.append({"code": str(c["code"]), "name": str(c["name"])})
+    all_breakdown_items = breakdown_items + extras_items
 
     with right_col:
         with st.container():
@@ -814,8 +841,8 @@ def home():
                 """
                 st.components.v1.html(sku_html, height=95)
                 
-                # 2) Item Name
-                st.markdown("<p class='subheading'>Item Name</p>", unsafe_allow_html=True)
+                # 2) Item Tally Name
+                st.markdown("<p class='subheading'>Item Tally Name</p>", unsafe_allow_html=True)
                 if st.session_state.get("ai_item_name"):
                     name_text = st.session_state["ai_item_name"]
                     name_html = f"""
@@ -836,8 +863,8 @@ def home():
 
                 st.markdown("<div style='margin-top: 10px;'></div>", unsafe_allow_html=True)
 
-                # 3) Description
-                st.markdown("<p class='subheading'>Description</p>", unsafe_allow_html=True)
+                # 3) Item Description
+                st.markdown("<p class='subheading'>Item Description</p>", unsafe_allow_html=True)
                 if st.session_state.get("ai_description"):
                     desc_text = st.session_state["ai_description"]
                     st.info(desc_text)
@@ -850,7 +877,7 @@ def home():
                 if ANTHROPIC_API_KEY and breakdown_items:
                     if st.button("✨ Generate Name & Description", key="gen_name_desc", use_container_width=False):
                         with st.spinner("Generating..."):
-                            name, desc, err = generate_product_name_and_description(breakdown_items, cat, sku)
+                            name, desc, err = generate_product_name_and_description(breakdown_items, cat, sku, extras_items=extras_items)
                             if name or desc:
                                 st.session_state["ai_item_name"] = name or ""
                                 st.session_state["ai_description"] = desc or ""
@@ -875,7 +902,7 @@ def home():
                 st.markdown("<p class='subheading'>SKU Breakdown</p>", unsafe_allow_html=True)
                 
                 breakdown_html = "<div style='font-family: -apple-system, BlinkMacSystemFont, sans-serif; font-size: 13px; color: #555; line-height: 1.8;'>"
-                for item in breakdown_items:
+                for item in all_breakdown_items:
                     breakdown_html += f"<div><code style='background: #f0f0f0; padding: 2px 6px; border-radius: 4px; font-size: 12px;'>{item['code']}</code> - {item['name']}</div>"
                 breakdown_html += "</div>"
                 st.markdown(breakdown_html, unsafe_allow_html=True)
@@ -934,7 +961,7 @@ def home():
                 
                 # 7) Save to History
                 st.markdown("<div style='margin-top: 15px;'></div>", unsafe_allow_html=True)
-                sku_description = st.session_state.get("ai_description", "") or " - ".join([item['name'] for item in breakdown_items])
+                sku_description = st.session_state.get("ai_description", "") or " - ".join([item['name'] for item in all_breakdown_items])
                 if st.button("💾 Save to History", key="save_history", use_container_width=False):
                     add_to_sku_history(sku, sku_description, cat)
                     st.toast(f"✅ Saved: {sku}")
