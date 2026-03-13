@@ -103,7 +103,8 @@ def generate_product_description(breakdown_items, category_name, sku):
         f"SKU: {sku}\n"
         f"Specifications:\n{parts}\n\n"
         f"Write a natural, readable description suitable for a product catalog. "
-        f"Do not use bullet points. Do not repeat the SKU code."
+        f"Do not use bullet points. Do not repeat the SKU code. Do not use markdown headings. "
+        f"Output plain text only, no formatting."
     )
 
     try:
@@ -791,14 +792,10 @@ def home():
                                 st.error(f"Failed: {err}")
                     
                     if st.session_state.get("ai_description"):
-                        st.markdown(
-                            f"<div style='background: #f0faf0; border: 1px solid #c3e6cb; border-radius: 8px; "
-                            f"padding: 12px 16px; font-size: 13px; color: #333; line-height: 1.6; margin: 8px 0;'>"
-                            f"{st.session_state['ai_description']}</div>",
-                            unsafe_allow_html=True
-                        )
+                        desc_text = st.session_state["ai_description"]
+                        st.info(desc_text)
                         copy_desc_html = f"""
-                        <button onclick="navigator.clipboard.writeText(`{st.session_state['ai_description'].replace('`', '')}`); this.innerText='✓ Copied'" 
+                        <button onclick="navigator.clipboard.writeText(`{desc_text.replace('`', '')}`); this.innerText='✓ Copied'" 
                             style="background: #e8f4fd; border: 1px solid #c5dff0; border-radius: 6px; 
                             padding: 5px 12px; cursor: pointer; color: #1a73e8; font-size: 11px; margin-top: 4px;">
                             📋 Copy Description
