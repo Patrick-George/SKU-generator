@@ -118,6 +118,53 @@ def generate_product_description(breakdown_items, category_name, sku):
     except Exception as e:
         return None, str(e)
 
+
+def generate_product_name_and_description(breakdown_items, category_name, sku):
+    """Generate both a product item name and description from SKU breakdown using Claude."""
+    if not ANTHROPIC_API_KEY:
+        return None, None, "ANTHROPIC_API_KEY environment variable not set."
+
+    parts = "\n".join([f"- {item['name']} (code: {item['code']})" for item in breakdown_items])
+    prompt = (
+        f"You are a product copywriter for Blastline India, an industrial equipment company.\n\n"
+        f"Product Category: {category_name}\n"
+        f"SKU: {sku}\n"
+        f"Specifications:\n{parts}\n\n"
+        f"Generate TWO things:\n"
+        f"1. ITEM NAME: A short, clear product name (e.g. 'Blastline 20L Manual Blast Machine - Standard'). "
+        f"Keep it under 10 words. Include key specs like capacity and type.\n"
+        f"2. DESCRIPTION: A concise, professional 2-3 sentence product description suitable for a product catalog. "
+        f"Do not use bullet points. Do not repeat the SKU code.\n\n"
+        f"Output EXACTLY in this format (no extra text):\n"
+        f"NAME: <the item name>\n"
+        f"DESCRIPTION: <the description>"
+    )
+
+    try:
+        client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
+        message = client.messages.create(
+            model="claude-haiku-4-5-20251001",
+            max_tokens=300,
+            messages=[{"role": "user", "content": prompt}]
+        )
+        response_text = message.content[0].text.strip()
+
+        item_name = ""
+        description = ""
+        for line in response_text.split("\n"):
+            line = line.strip()
+            if line.upper().startswith("NAME:"):
+                item_name = line[5:].strip()
+            elif line.upper().startswith("DESCRIPTION:"):
+                description = line[12:].strip()
+
+        if not item_name and not description:
+            return None, None, "Could not parse AI response."
+
+        return item_name, description, None
+    except Exception as e:
+        return None, None, str(e)
+
 # ==================================================
 # HELPERS
 # ==================================================
@@ -689,13 +736,11 @@ def home():
             breakdown_items.append({"code": str(c["code"]), "name": str(c["name"])})
 
     with right_col:
-        # Right panel with card-style background using container
         with st.container():
-            # Generated SKU Section - larger subheading
+            # 1) Generated SKU
             st.markdown("<p class='subheading'>Generated SKU</p>", unsafe_allow_html=True)
             
             if sku:
-                # SKU box - dynamic width with pulsating green dot
                 sku_html = f"""
                 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet" />
                 <style>
@@ -769,48 +814,79 @@ def home():
                 """
                 st.components.v1.html(sku_html, height=95)
                 
-                # SKU Breakdown - vertical list format
+                # 2) Item Name
+                st.markdown("<p class='subheading'>Item Name</p>", unsafe_allow_html=True)
+                if st.session_state.get("ai_item_name"):
+                    name_text = st.session_state["ai_item_name"]
+                    name_html = f"""
+                    <div style="
+                        background: #f0faf0;
+                        border: 1px solid #c8e6c9;
+                        border-radius: 8px;
+                        padding: 12px 16px;
+                        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                        font-size: 15px;
+                        font-weight: 600;
+                        color: #2e7d32;
+                    ">{name_text}</div>
+                    """
+                    st.markdown(name_html, unsafe_allow_html=True)
+                else:
+                    st.markdown("<p style='color: #999; font-size: 13px; font-style: italic;'>Click 'Generate Name & Description' below</p>", unsafe_allow_html=True)
+
+                st.markdown("<div style='margin-top: 10px;'></div>", unsafe_allow_html=True)
+
+                # 3) Description
+                st.markdown("<p class='subheading'>Description</p>", unsafe_allow_html=True)
+                if st.session_state.get("ai_description"):
+                    desc_text = st.session_state["ai_description"]
+                    st.info(desc_text)
+                else:
+                    st.markdown("<p style='color: #999; font-size: 13px; font-style: italic;'>Click 'Generate Name & Description' below</p>", unsafe_allow_html=True)
+
+                st.markdown("<div style='margin-top: 10px;'></div>", unsafe_allow_html=True)
+
+                # 4) Generate Name & Description button
+                if ANTHROPIC_API_KEY and breakdown_items:
+                    if st.button("✨ Generate Name & Description", key="gen_name_desc", use_container_width=False):
+                        with st.spinner("Generating..."):
+                            name, desc, err = generate_product_name_and_description(breakdown_items, cat, sku)
+                            if name or desc:
+                                st.session_state["ai_item_name"] = name or ""
+                                st.session_state["ai_description"] = desc or ""
+                                st.rerun()
+                            else:
+                                st.error(f"Failed: {err}")
+
+                    if st.session_state.get("ai_item_name") or st.session_state.get("ai_description"):
+                        copy_all_text = f"{st.session_state.get('ai_item_name', '')}\\n{st.session_state.get('ai_description', '')}"
+                        copy_btn_html = f"""
+                        <button onclick="navigator.clipboard.writeText(`{st.session_state.get('ai_item_name', '')}\\n{st.session_state.get('ai_description', '').replace('`', '')}`); this.innerText='✓ Copied'" 
+                            style="background: #e8f4fd; border: 1px solid #c5dff0; border-radius: 6px; 
+                            padding: 5px 12px; cursor: pointer; color: #1a73e8; font-size: 11px; margin-top: 4px;">
+                            📋 Copy Name & Description
+                        </button>
+                        """
+                        st.components.v1.html(copy_btn_html, height=40)
+
+                st.markdown("<div style='margin-top: 15px;'></div>", unsafe_allow_html=True)
+
+                # 5) SKU Breakdown
                 st.markdown("<p class='subheading'>SKU Breakdown</p>", unsafe_allow_html=True)
                 
-                # Build breakdown HTML as vertical list
                 breakdown_html = "<div style='font-family: -apple-system, BlinkMacSystemFont, sans-serif; font-size: 13px; color: #555; line-height: 1.8;'>"
                 for item in breakdown_items:
                     breakdown_html += f"<div><code style='background: #f0f0f0; padding: 2px 6px; border-radius: 4px; font-size: 12px;'>{item['code']}</code> - {item['name']}</div>"
                 breakdown_html += "</div>"
                 st.markdown(breakdown_html, unsafe_allow_html=True)
-                
-                st.markdown("<div style='margin-top: 15px;'></div>", unsafe_allow_html=True)
-
-                # AI Product Description
-                if ANTHROPIC_API_KEY and breakdown_items:
-                    if st.button("✨ Generate Description", key="gen_desc", use_container_width=False):
-                        with st.spinner("Generating..."):
-                            desc, err = generate_product_description(breakdown_items, cat, sku)
-                            if desc:
-                                st.session_state["ai_description"] = desc
-                            else:
-                                st.error(f"Failed: {err}")
-                    
-                    if st.session_state.get("ai_description"):
-                        desc_text = st.session_state["ai_description"]
-                        st.info(desc_text)
-                        copy_desc_html = f"""
-                        <button onclick="navigator.clipboard.writeText(`{desc_text.replace('`', '')}`); this.innerText='✓ Copied'" 
-                            style="background: #e8f4fd; border: 1px solid #c5dff0; border-radius: 6px; 
-                            padding: 5px 12px; cursor: pointer; color: #1a73e8; font-size: 11px; margin-top: 4px;">
-                            📋 Copy Description
-                        </button>
-                        """
-                        st.components.v1.html(copy_desc_html, height=40)
 
                 st.markdown("<div style='margin-top: 15px;'></div>", unsafe_allow_html=True)
                 
-                # Generated QR Code Section - larger subheading, dynamic width
+                # 6) Generated QR Code
                 st.markdown("<p class='subheading'>Generated QR Code</p>", unsafe_allow_html=True)
                 
                 qr_base64 = get_qr_code_base64(sku)
                 
-                # Create downloadable QR PNG data as base64
                 qr_buffer = generate_qr_code(sku, size=300)
                 qr_download_base64 = base64.b64encode(qr_buffer.getvalue()).decode()
                 
@@ -856,10 +932,9 @@ def home():
                 """
                 st.components.v1.html(qr_html, height=130)
                 
-                # Save to History button
+                # 7) Save to History
                 st.markdown("<div style='margin-top: 15px;'></div>", unsafe_allow_html=True)
-                # Create description from breakdown items
-                sku_description = " - ".join([item['name'] for item in breakdown_items])
+                sku_description = st.session_state.get("ai_description", "") or " - ".join([item['name'] for item in breakdown_items])
                 if st.button("💾 Save to History", key="save_history", use_container_width=False):
                     add_to_sku_history(sku, sku_description, cat)
                     st.toast(f"✅ Saved: {sku}")
