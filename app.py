@@ -15,7 +15,7 @@ from PIL import Image
 # ==================================================
 COPY_BOX_HEIGHT = 160
 DEFAULT_SEPARATOR = "-"
-DEFAULT_EXTRAS_MODE = "Single"
+DEFAULT_EXTRAS_MODE = "Multiple"
 EXTRAS_PER_PAGE = 8
 MAX_SKU_HISTORY = 15  # Maximum number of SKUs to keep in history
 

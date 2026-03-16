@@ -2,7 +2,7 @@
   "inventory": {
     "Blast Machine": {
       "settings": {
-        "extras_mode": "Single",
+        "extras_mode": "Multiple",
         "separator": ""
       },
       "fields": {
@@ -202,7 +202,7 @@
     },
     "Air Receiver": {
       "settings": {
-        "extras_mode": "Single",
+        "extras_mode": "Multiple",
         "separator": ""
       },
       "fields": {
