@@ -131,15 +131,19 @@ def generate_product_name_and_description(breakdown_items, category_name, sku, e
             [f"- {item['name']} (code: {item['code']})" for item in extras_items]
         )
 
+    machine_code = breakdown_items[0]["code"] if breakdown_items else ""
+    machine_name = breakdown_items[0]["name"] if breakdown_items else category_name
+
     prompt = (
         f"You are generating item names for Blastline India's inventory/Tally system.\n\n"
         f"Product Category: {category_name}\n"
+        f"Machine: {machine_code} - {machine_name}\n"
         f"SKU: {sku}\n"
         f"Specifications:\n{parts}{extras_str}\n\n"
         f"Generate TWO things based on these rules:\n\n"
         f"1. ITEM TALLY NAME: A short space-separated abbreviated name for Tally/inventory.\n"
         f"   Rules:\n"
-        f"   - Start with category abbreviation (e.g. BLBM for Blastline Blast Machine)\n"
+        f"   - Start with the machine code exactly as given: {machine_code}\n"
         f"   - Then capacity + config code (e.g. 200A for 200ltr Automatic, 20M for 20ltr Manual)\n"
         f"   - Then certification abbreviation if any (e.g. T for Third-party Tested, ST for Standard)\n"
         f"   - Then valve abbreviation (e.g. SV=Sand Valve, MV=Micro Valve, GV=Grit Valve, TV=Thompson Valve, BV=Ball Valve, MS=Mini Sand Valve, MG=Mini Grit Valve)\n"
@@ -148,10 +152,10 @@ def generate_product_name_and_description(breakdown_items, category_name, sku, e
         f"   - If extras selected, add ' + ' then extras codes space-separated\n"
         f"   - If screen/cover selected, add ' + Fittings'\n"
         f"   - Keep it SHORT - all abbreviations, no commas\n"
-        f"   Example: BLBM 200A T SV 1 + MS PG RV + Fittings\n\n"
+        f"   Example: {machine_code} 200A T SV 1 + MS PG RV + Fittings\n\n"
         f"2. ITEM DESCRIPTION: A single-line expanded but still concise description.\n"
         f"   Rules:\n"
-        f"   - Start with full category name (e.g. 'Blastline Blast Machine')\n"
+        f"   - Start with full machine name (e.g. '{machine_name}')\n"
         f"   - Then capacity in litres + config name (e.g. '200ltr Automatic')\n"
         f"   - Certification in parentheses if any (e.g. '(Third Party Tested)')\n"
         f"   - Use 'w/' for 'with' (e.g. 'w/ Flat Sand Valve')\n"
@@ -159,7 +163,7 @@ def generate_product_name_and_description(breakdown_items, category_name, sku, e
         f"   - If extras, add '+ Extras: ' then codes comma-space-separated (e.g. '+ Extras: MS, PG, RV')\n"
         f"   - Add '+ Fittings' at end if screen/cover present\n"
         f"   - Keep it to ONE line, use abbreviations where natural\n"
-        f"   Example: Blastline Blast Machine 200ltr Automatic (Third Party Tested) w/ Flat Sand Valve w/ Screen + Cover + Extras: MS, PG, RV + Fittings\n\n"
+        f"   Example: {machine_name} 200ltr Automatic (Third Party Tested) w/ Flat Sand Valve w/ Screen + Cover + Extras: MS, PG, RV + Fittings\n\n"
         f"Output EXACTLY in this format (no extra text, no markdown):\n"
         f"NAME: <the tally name>\n"
         f"DESCRIPTION: <the item description>"
