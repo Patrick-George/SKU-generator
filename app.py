@@ -620,7 +620,11 @@ def decode_sku(sku_code, inventory):
                 matched = False
                 break
         
-        # Check for extras
+        # Check for extras (strip leading X marker if present)
+        if remaining.startswith("X"):
+            remaining = remaining[1:]
+        elif remaining.startswith(sep + "X"):
+            remaining = remaining[len(sep) + 1:]
         matched_extras = []
         for extra in extras:
             code = extra.get("code", "")
@@ -796,7 +800,7 @@ def home():
     # Calculate SKU
     base = sep.join([sel[k]["code"] for k in ordered_fields(fields) if sel.get(k) and sel[k]["code"]])
     extras_codes = "".join([c["code"] for c in chosen])
-    sku = base + (sep if base and extras_codes else "") + extras_codes
+    sku = base + (sep + "X" if base and extras_codes else "") + extras_codes
     
     # Build breakdown items (base fields only) and extras items separately
     breakdown_items = []
