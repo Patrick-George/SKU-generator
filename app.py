@@ -119,12 +119,13 @@ def generate_product_description(breakdown_items, category_name, sku):
         return None, str(e)
 
 
-def generate_product_name_and_description(breakdown_items, category_name, sku, extras_items=None):
+def generate_product_name_and_description(breakdown_items, category_name, sku, extras_items=None, fittings_selected=False):
     """Generate both an item name and item description from SKU breakdown using Claude."""
     if not ANTHROPIC_API_KEY:
         return None, None, "ANTHROPIC_API_KEY environment variable not set."
 
-    parts = "\n".join([f"- {item['name']} (code: {item['code']})" for item in breakdown_items])
+    display_items = [item for item in breakdown_items if item.get("field") != "Fittings"]
+    parts = "\n".join([f"- {item['name']} (code: {item['code']})" for item in display_items])
     extras_str = ""
     if extras_items:
         extras_str = "\nExtras selected:\n" + "\n".join(
@@ -140,6 +141,7 @@ def generate_product_name_and_description(breakdown_items, category_name, sku, e
         f"Machine: {machine_code} - {machine_name}\n"
         f"SKU: {sku}\n"
         f"Specifications:\n{parts}{extras_str}\n\n"
+        f"{'FITTINGS RULE: A fitting was selected. Append \" + Fittings\" at the end of both the item name and the item description. Do NOT include the specific fitting name or code — just write \"+ Fittings\".' + chr(10) + chr(10) if fittings_selected else ''}"
         f"IMPORTANT SIZE RULE: SKU (shortest, just codes) < ITEM NAME (medium, readable summary) < ITEM DESCRIPTION (longest, full detail). "
         f"The item name MUST be longer and more descriptive than the SKU. The item description MUST be longer than the item name.\n\n"
         f"Generate TWO things. Use ALL the specification fields above — do not skip any.\n\n"
@@ -804,9 +806,12 @@ def home():
     
     # Build breakdown items (base fields only) and extras items separately
     breakdown_items = []
+    fittings_selected = False
     for k in ordered_fields(fields):
         if sel.get(k) and sel[k].get("code") and sel[k].get("name"):
-            breakdown_items.append({"code": str(sel[k]["code"]), "name": str(sel[k]["name"])})
+            breakdown_items.append({"code": str(sel[k]["code"]), "name": str(sel[k]["name"]), "field": k})
+            if k.lower() == "fittings":
+                fittings_selected = True
     extras_items = []
     for c in chosen:
         if c.get("code") and c.get("name"):
@@ -928,7 +933,7 @@ def home():
                 if ANTHROPIC_API_KEY and breakdown_items:
                     if st.button("✨ Generate Name & Description", key="gen_name_desc", use_container_width=False):
                         with st.spinner("Generating..."):
-                            name, desc, err = generate_product_name_and_description(breakdown_items, cat, sku, extras_items=extras_items)
+                            name, desc, err = generate_product_name_and_description(breakdown_items, cat, sku, extras_items=extras_items, fittings_selected=fittings_selected)
                             if name or desc:
                                 st.session_state["ai_item_name"] = name or ""
                                 st.session_state["ai_description"] = desc or ""
