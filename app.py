@@ -225,6 +225,22 @@ def ordered_fields(fields):
     """
     return sorted(fields.keys(), key=lambda k: fields[k].get("order", 999))
 
+def get_machine_field(cat_data):
+    """Return the name of the machine-selector field for a category."""
+    return cat_data.get("settings", {}).get("machine_field", "Machine")
+
+def filter_for_machine(items, machine_code):
+    """
+    Return only items whose 'machines' tag includes machine_code.
+    Items with no 'machines' key or an empty list pass through (shown for all machines).
+    """
+    if not machine_code:
+        return items
+    return [
+        item for item in items
+        if not item.get("machines") or machine_code in item["machines"]
+    ]
+
 def normalize_option_df(data):
     """
     Convert options list to normalized DataFrame for editing.
@@ -669,6 +685,10 @@ def home():
 
     sel = {}
     chosen = []
+
+    # Determine machine-selector field and get selected machine code
+    mf_name = get_machine_field(cat_data)
+    selected_machine_code = None
     
     st.markdown("<div style='margin-top: 30px;'></div>", unsafe_allow_html=True)
 
@@ -682,19 +702,41 @@ def home():
         # Create a narrower container for dropdowns
         config_inner, config_spacer = st.columns([3, 1])
         with config_inner:
+            # Render machine-selector field first (always visible)
+            if mf_name in fields:
+                mf_opts = fields[mf_name]["options"]
+                if mf_opts and not mf_opts[0].get("type") == "text":
+                    st.markdown(f"<p style='font-size: 12px; color: #666; margin-bottom: 2px;'>{mf_name}</p>", unsafe_allow_html=True)
+                    mf_selection = st.selectbox(
+                        mf_name,
+                        mf_opts,
+                        format_func=lambda x: f"{x['code']} - {x['name']}",
+                        help=f"Select {mf_name}",
+                        label_visibility="collapsed"
+                    )
+                    sel[mf_name] = {"code": mf_selection["code"], "name": mf_selection["name"]}
+                    selected_machine_code = mf_selection["code"]
+
+            # Render remaining fields, filtered by selected machine
             for f in ordered_fields(fields):
+                if f == mf_name:
+                    continue
+                field_machines = fields[f].get("machines", [])
+                if field_machines and selected_machine_code and selected_machine_code not in field_machines:
+                    continue
+
                 opts = fields[f]["options"]
                 is_text = opts and opts[0].get("type") == "text"
                 if is_text:
                     text_val = st.text_input(f, help=f"Enter {f}", placeholder=f"Enter {f}", label_visibility="collapsed")
                     sel[f] = {"code": text_val, "name": text_val}
                 else:
-                    if opts:
-                        # Show field name as label, dropdown shows Code - Name only
+                    filtered_opts = filter_for_machine(opts, selected_machine_code) if selected_machine_code else opts
+                    if filtered_opts:
                         st.markdown(f"<p style='font-size: 12px; color: #666; margin-bottom: 2px;'>{f}</p>", unsafe_allow_html=True)
                         o = st.selectbox(
                             f, 
-                            opts, 
+                            filtered_opts, 
                             format_func=lambda x: f"{x['code']} - {x['name']}", 
                             help=f"Select {f}",
                             label_visibility="collapsed"
@@ -706,11 +748,13 @@ def home():
         # Extras Section - larger subheading
         st.markdown("<p class='subheading'>Extras</p>", unsafe_allow_html=True)
         
-        if extras:
-            sorted_extras = sorted(extras, key=lambda x: x.get("order", 999))
+        # Filter extras by selected machine
+        visible_extras = filter_for_machine(extras, selected_machine_code) if selected_machine_code else extras
+        
+        if visible_extras:
+            sorted_extras = sorted(visible_extras, key=lambda x: x.get("order", 999))
             
             if extras_mode == "Single":
-                # Single selection mode - use radio button in horizontal layout
                 extra_options = ["None"] + [e["name"] for e in sorted_extras]
                 
                 selected_name = st.radio(
@@ -721,14 +765,12 @@ def home():
                     label_visibility="collapsed"
                 )
                 
-                # Find the selected extra and add to chosen
                 if selected_name != "None":
                     for e in sorted_extras:
                         if e["name"] == selected_name and e.get("code"):
                             chosen.append({"code": e["code"], "name": e["name"]})
                             break
             else:
-                # Multiple selection mode - 5-column grid with proper rows
                 num_cols = 5
                 total_extras = len(sorted_extras)
                 num_rows = (total_extras + num_cols - 1) // num_cols
@@ -744,7 +786,10 @@ def home():
                                     if e.get("code"):
                                         chosen.append({"code": e["code"], "name": e["name"]})
         else:
-            st.info("No extras configured")
+            if extras and selected_machine_code:
+                st.info("No extras available for this machine")
+            else:
+                st.info("No extras configured")
 
     # Calculate SKU
     base = sep.join([sel[k]["code"] for k in ordered_fields(fields) if sel.get(k) and sel[k]["code"]])
@@ -1071,7 +1116,7 @@ def admin():
                 st.session_state["confirm_delete_cat"] = cat
                 st.rerun()
 
-    tab1, tab2, tab3, tab4, tab5 = st.tabs(["🛠️ Fields Configuration", "🎁 Extras Management", "⚙️ Category Settings", "📊 Export Matrix", "💾 Backup & Restore"])
+    tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(["🛠️ Fields Configuration", "🎁 Extras Management", "⚙️ Category Settings", "📊 Export Matrix", "💾 Backup & Restore", "🔗 Machine Mapping"])
 
     # ---------- FIELDS CONFIG ----------
     with tab1:
@@ -1405,6 +1450,146 @@ def admin():
                     show_error("❌ Invalid JSON file. Please upload a valid backup file.")
                 except Exception as e:
                     show_error(f"❌ Error reading file: {str(e)}")
+
+    # ---------- MACHINE MAPPING ----------
+    with tab6:
+        cat_data = inv[cat]
+        normalize_fields(cat_data)
+        fields = cat_data["fields"]
+        extras = cat_data.get("extras", [])
+        settings = cat_data.get("settings", {})
+
+        st.markdown("### Machine-Based Field Visibility")
+        st.caption("Configure which fields, options, and extras are available for each machine type.")
+
+        field_names = ordered_fields(fields)
+        if not field_names:
+            st.warning("No fields configured. Add fields first in the Fields Configuration tab.")
+        else:
+            with st.expander("⚙️ Machine Selector Field", expanded=False):
+                current_machine_field = settings.get("machine_field", "Machine")
+                machine_field_name = st.selectbox(
+                    "Which field acts as the Machine selector?",
+                    field_names,
+                    index=field_names.index(current_machine_field) if current_machine_field in field_names else 0,
+                    key="machine_field_select"
+                )
+                if st.button("Set Machine Field"):
+                    settings["machine_field"] = machine_field_name
+                    cat_data["settings"] = settings
+                    show_success(f"Machine selector field set to '{machine_field_name}'")
+                    st.rerun()
+
+            mf_name = settings.get("machine_field", "Machine")
+            if mf_name not in fields:
+                st.info(f"Machine field '{mf_name}' not found in this category. Set one above.")
+            else:
+                machine_opts = fields[mf_name].get("options", [])
+                machine_opts = [o for o in machine_opts if o.get("code")]
+                if not machine_opts:
+                    st.info("No machine options configured yet. Add options to the machine field first.")
+                else:
+                    machine_labels = [f"{o['code']} - {o['name']}" for o in machine_opts]
+                    selected_label = st.selectbox("Configure mapping for machine:", machine_labels, key="mapping_machine_select")
+                    selected_machine_code = machine_opts[machine_labels.index(selected_label)]["code"]
+
+                    other_fields = [f for f in field_names if f != mf_name]
+                    non_text_fields = [f for f in other_fields if not (fields[f]["options"] and fields[f]["options"][0].get("type") == "text")]
+                    text_fields = [f for f in other_fields if fields[f]["options"] and fields[f]["options"][0].get("type") == "text"]
+
+                    st.markdown("---")
+
+                    with st.expander("📋 Field Visibility", expanded=True):
+                        st.caption("Check fields that should be **visible** when this machine is selected. Unchecked fields will be hidden.")
+                        field_checks = {}
+                        for f in other_fields:
+                            current_machines = fields[f].get("machines", [])
+                            default_on = not current_machines or selected_machine_code in current_machines
+                            field_checks[f] = st.checkbox(f, value=default_on, key=f"fv_{cat}_{selected_machine_code}_{f}")
+
+                    if non_text_fields:
+                        visible_dropdown_fields = [f for f in non_text_fields if field_checks.get(f, True)]
+                        if visible_dropdown_fields:
+                            with st.expander("🔧 Option Visibility (per field)", expanded=False):
+                                st.caption("For each visible dropdown field, check which options are available for this machine.")
+                                option_checks = {}
+                                for f in visible_dropdown_fields:
+                                    st.markdown(f"**{f}**")
+                                    opts = fields[f]["options"]
+                                    option_checks[f] = {}
+                                    for i, opt in enumerate(opts):
+                                        if not opt.get("code"):
+                                            continue
+                                        opt_machines = opt.get("machines", [])
+                                        default_on = not opt_machines or selected_machine_code in opt_machines
+                                        label = f"{opt['code']} - {opt.get('name', '')}"
+                                        option_checks[f][i] = st.checkbox(label, value=default_on, key=f"ov_{cat}_{selected_machine_code}_{f}_{i}")
+                                    st.markdown("---")
+                        else:
+                            option_checks = {}
+                    else:
+                        option_checks = {}
+
+                    if extras:
+                        with st.expander("🎁 Extras Visibility", expanded=False):
+                            st.caption("Check which extras are available when this machine is selected.")
+                            extras_checks = {}
+                            for i, e in enumerate(extras):
+                                if not e.get("code"):
+                                    continue
+                                e_machines = e.get("machines", [])
+                                default_on = not e_machines or selected_machine_code in e_machines
+                                label = f"{e['code']} - {e.get('name', '')}"
+                                extras_checks[i] = st.checkbox(label, value=default_on, key=f"ev_{cat}_{selected_machine_code}_{i}")
+                    else:
+                        extras_checks = {}
+
+                    st.markdown("---")
+                    if st.button("💾 Save Machine Mapping", type="primary"):
+                        all_machine_codes = [o["code"] for o in machine_opts if o.get("code")]
+
+                        for f in other_fields:
+                            current_machines = fields[f].get("machines", [])
+                            new_machines = set(current_machines) if current_machines else set(all_machine_codes)
+                            if field_checks.get(f, True):
+                                new_machines.add(selected_machine_code)
+                            else:
+                                new_machines.discard(selected_machine_code)
+                            if new_machines >= set(all_machine_codes):
+                                fields[f].pop("machines", None)
+                            else:
+                                fields[f]["machines"] = sorted(new_machines)
+
+                        for f, opts_map in option_checks.items():
+                            opts = fields[f]["options"]
+                            for i, checked in opts_map.items():
+                                opt = opts[i]
+                                current_machines = opt.get("machines", [])
+                                new_machines = set(current_machines) if current_machines else set(all_machine_codes)
+                                if checked:
+                                    new_machines.add(selected_machine_code)
+                                else:
+                                    new_machines.discard(selected_machine_code)
+                                if new_machines >= set(all_machine_codes):
+                                    opt.pop("machines", None)
+                                else:
+                                    opt["machines"] = sorted(new_machines)
+
+                        for i, checked in extras_checks.items():
+                            e = extras[i]
+                            current_machines = e.get("machines", [])
+                            new_machines = set(current_machines) if current_machines else set(all_machine_codes)
+                            if checked:
+                                new_machines.add(selected_machine_code)
+                            else:
+                                new_machines.discard(selected_machine_code)
+                            if new_machines >= set(all_machine_codes):
+                                e.pop("machines", None)
+                            else:
+                                e["machines"] = sorted(new_machines)
+
+                        show_success(f"Machine mapping saved for '{selected_label}'!")
+                        st.rerun()
 
     st.markdown("---")
     
