@@ -120,7 +120,7 @@ def generate_product_description(breakdown_items, category_name, sku):
 
 
 def generate_product_name_and_description(breakdown_items, category_name, sku, extras_items=None):
-    """Generate both a tally item name and item description from SKU breakdown using Claude."""
+    """Generate both an item name and item description from SKU breakdown using Claude."""
     if not ANTHROPIC_API_KEY:
         return None, None, "ANTHROPIC_API_KEY environment variable not set."
 
@@ -135,37 +135,35 @@ def generate_product_name_and_description(breakdown_items, category_name, sku, e
     machine_name = breakdown_items[0]["name"] if breakdown_items else category_name
 
     prompt = (
-        f"You are generating item names for Blastline India's inventory/Tally system.\n\n"
+        f"You are generating item names for Blastline India's inventory system.\n\n"
         f"Product Category: {category_name}\n"
         f"Machine: {machine_code} - {machine_name}\n"
         f"SKU: {sku}\n"
         f"Specifications:\n{parts}{extras_str}\n\n"
-        f"Generate TWO things based on these rules:\n\n"
-        f"1. ITEM TALLY NAME: A short space-separated abbreviated name for Tally/inventory.\n"
+        f"IMPORTANT SIZE RULE: SKU (shortest, just codes) < ITEM NAME (medium, readable summary) < ITEM DESCRIPTION (longest, full detail). "
+        f"The item name MUST be longer and more descriptive than the SKU. The item description MUST be longer than the item name.\n\n"
+        f"Generate TWO things. Use ALL the specification fields above — do not skip any.\n\n"
+        f"1. ITEM NAME: A readable, medium-length product name that covers every field.\n"
         f"   Rules:\n"
         f"   - Start with the machine code exactly as given: {machine_code}\n"
-        f"   - Then capacity + config code (e.g. 200A for 200ltr Automatic, 20M for 20ltr Manual)\n"
-        f"   - Then certification abbreviation if any (e.g. T for Third-party Tested, ST for Standard)\n"
-        f"   - Then valve abbreviation (e.g. SV=Sand Valve, MV=Micro Valve, GV=Grit Valve, TV=Thompson Valve, BV=Ball Valve, MS=Mini Sand Valve, MG=Mini Grit Valve)\n"
-        f"   - Then inlet/outlet combo number if applicable\n"
-        f"   - Separate each spec with a SPACE (not commas)\n"
-        f"   - If extras selected, add ' + ' then extras codes space-separated\n"
-        f"   - If screen/cover selected, add ' + Fittings'\n"
-        f"   - Keep it SHORT - all abbreviations, no commas\n"
-        f"   Example: {machine_code} 200A T SV 1 + MS PG RV + Fittings\n\n"
-        f"2. ITEM DESCRIPTION: A single-line expanded but still concise description.\n"
+        f"   - Include info from EVERY specification field: capacity, configuration, certification, valve, screen/cover, inlet, outlet, type, stacking, etc. — whatever fields are present\n"
+        f"   - Use short readable abbreviations (e.g. 200L for 200 Ltr, Auto for Automatic, Std for Standard, SV for Sand Valve)\n"
+        f"   - Separate specs with spaces\n"
+        f"   - If extras selected, add ' + ' then extras abbreviations space-separated\n"
+        f"   - Must be noticeably longer and more descriptive than the raw SKU code\n"
+        f"   Example: {machine_code} 200L Auto StdTP FlatSV Scr+Cvr + MS PG RV\n\n"
+        f"2. ITEM DESCRIPTION: A full, human-readable single-line description with no abbreviations.\n"
         f"   Rules:\n"
-        f"   - Start with full machine name (e.g. '{machine_name}')\n"
-        f"   - Then capacity in litres + config name (e.g. '200ltr Automatic')\n"
-        f"   - Certification in parentheses if any (e.g. '(Third Party Tested)')\n"
+        f"   - Start with full machine name: '{machine_name}'\n"
+        f"   - Spell out every field in full: capacity in litres, configuration name, certification name, valve type, screen/cover status, and any other fields\n"
+        f"   - Certification in parentheses (e.g. '(Standard Third Party)')\n"
         f"   - Use 'w/' for 'with' (e.g. 'w/ Flat Sand Valve')\n"
-        f"   - Screen/Cover status (e.g. 'w/ Screen + Cover' or 'w/ No Screen + No Cover')\n"
-        f"   - If extras, add '+ Extras: ' then codes comma-space-separated (e.g. '+ Extras: MS, PG, RV')\n"
-        f"   - Add '+ Fittings' at end if screen/cover present\n"
-        f"   - Keep it to ONE line, use abbreviations where natural\n"
-        f"   Example: {machine_name} 200ltr Automatic (Third Party Tested) w/ Flat Sand Valve w/ Screen + Cover + Extras: MS, PG, RV + Fittings\n\n"
+        f"   - Include screen/cover status (e.g. 'w/ Screen + Cover' or 'w/ No Screen + Cover')\n"
+        f"   - If extras, add '+ Extras: ' then full names comma-space-separated\n"
+        f"   - Must be longer and more detailed than the item name — spell out everything, no abbreviations\n"
+        f"   Example: {machine_name} 200ltr Automatic (Standard Third Party) w/ Flat Sand Valve w/ Screen + Cover + Extras: Moisture Separator, PG + RV\n\n"
         f"Output EXACTLY in this format (no extra text, no markdown):\n"
-        f"NAME: <the tally name>\n"
+        f"NAME: <the item name>\n"
         f"DESCRIPTION: <the item description>"
     )
 
@@ -890,8 +888,8 @@ def home():
                 """
                 st.components.v1.html(sku_html, height=95)
                 
-                # 2) Item Tally Name
-                st.markdown("<p class='subheading'>Item Tally Name</p>", unsafe_allow_html=True)
+                # 2) Item Name
+                st.markdown("<p class='subheading'>Item Name</p>", unsafe_allow_html=True)
                 if st.session_state.get("ai_item_name"):
                     name_text = st.session_state["ai_item_name"]
                     name_html = f"""
