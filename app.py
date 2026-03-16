@@ -170,8 +170,8 @@ def generate_product_name_and_description(breakdown_items, category_name, sku, e
     try:
         client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
         message = client.messages.create(
-            model="claude-haiku-4-5-20251001",
-            max_tokens=300,
+            model="claude-sonnet-4-6",
+            max_tokens=500,
             messages=[{"role": "user", "content": prompt}]
         )
         response_text = message.content[0].text.strip()
