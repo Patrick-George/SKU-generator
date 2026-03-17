@@ -706,21 +706,37 @@ def home():
     with st.sidebar:
         render_sidebar_nav("home")
 
-    # Header styles
+    # Global styles
     st.markdown("""
         <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
         .subheading {
-            font-size: 18px;
+            font-size: 13px;
             font-weight: 600;
-            color: #333;
-            margin-bottom: 12px;
-            font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+            color: #888;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 8px;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+        }
+        .page-title {
+            text-align: center;
+            margin-bottom: 2px;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            font-weight: 700;
+            font-size: 28px;
+            color: #1a1a1a;
+        }
+        .config-label {
+            font-size: 12px;
+            color: #888;
+            margin-bottom: 2px;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
         }
         </style>
     """, unsafe_allow_html=True)
 
-    # Centered Header
-    st.markdown("<h2 style='text-align: center; margin-bottom: 5px; font-family: -apple-system, BlinkMacSystemFont, sans-serif;'>Blastline SKU Configurator</h2>", unsafe_allow_html=True)
+    st.markdown("<h2 class='page-title'>Blastline SKU Configurator</h2>", unsafe_allow_html=True)
 
     inv = st.session_state["sku_data"]["inventory"]
     if not inv:
@@ -763,7 +779,7 @@ def home():
             if mf_name in fields:
                 mf_opts = fields[mf_name]["options"]
                 if mf_opts and not mf_opts[0].get("type") == "text":
-                    st.markdown(f"<p style='font-size: 12px; color: #666; margin-bottom: 2px;'>{mf_name}</p>", unsafe_allow_html=True)
+                    st.markdown(f"<p class='config-label'>{mf_name}</p>", unsafe_allow_html=True)
                     mf_selection = st.selectbox(
                         mf_name,
                         mf_opts,
@@ -790,7 +806,7 @@ def home():
                 else:
                     filtered_opts = filter_for_machine(opts, selected_machine_code) if selected_machine_code else opts
                     if filtered_opts:
-                        st.markdown(f"<p style='font-size: 12px; color: #666; margin-bottom: 2px;'>{f}</p>", unsafe_allow_html=True)
+                        st.markdown(f"<p class='config-label'>{f}</p>", unsafe_allow_html=True)
                         o = st.selectbox(
                             f, 
                             filtered_opts, 
@@ -869,226 +885,146 @@ def home():
 
     with right_col:
         with st.container():
-            # 1) Generated SKU
-            st.markdown("<p class='subheading'>Generated SKU</p>", unsafe_allow_html=True)
-            
             if sku:
-                sku_html = f"""
-                <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet" />
+                mapped_name, mapped_desc = generate_mapped_name_and_description(sel, ordered_fields(fields), chosen, fittings_selected)
+                escaped_name = mapped_name.replace("'", "\\'").replace("`", "") if mapped_name else ""
+                escaped_desc = mapped_desc.replace("'", "\\'").replace("`", "") if mapped_desc else ""
+
+                qr_base64 = get_qr_code_base64(sku)
+                qr_buffer = generate_qr_code(sku, size=300)
+                qr_download_base64 = base64.b64encode(qr_buffer.getvalue()).decode()
+
+                output_html = f"""
+                <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Material+Symbols+Outlined" rel="stylesheet" />
                 <style>
-                    * {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }}
-                    html, body {{ margin: 0; padding: 0; overflow: visible; }}
-                    @keyframes pulse {{
-                        0% {{ box-shadow: 0 0 0 0 rgba(76, 175, 80, 0.7); }}
-                        70% {{ box-shadow: 0 0 0 8px rgba(76, 175, 80, 0); }}
-                        100% {{ box-shadow: 0 0 0 0 rgba(76, 175, 80, 0); }}
+                    * {{ font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; margin: 0; padding: 0; box-sizing: border-box; }}
+                    html, body {{ overflow: visible; }}
+                    .section-label {{
+                        font-size: 11px; font-weight: 600; color: #999; text-transform: uppercase;
+                        letter-spacing: 0.8px; margin-bottom: 6px;
                     }}
-                    @keyframes fadeOut {{
-                        0% {{ opacity: 1; }}
-                        70% {{ opacity: 1; }}
-                        100% {{ opacity: 0; }}
+                    .copy-card {{
+                        border-radius: 10px; padding: 14px 16px;
+                        display: flex; align-items: center; justify-content: space-between;
+                        cursor: pointer; transition: box-shadow 0.15s ease;
+                        gap: 12px;
                     }}
-                    .pulse-dot {{
-                        width: 10px;
-                        height: 10px;
-                        background: #4CAF50;
-                        border-radius: 50%;
-                        animation: pulse 1s ease-out 3, fadeOut 3s ease-out forwards;
-                        position: absolute;
-                        top: 8px;
-                        right: 8px;
+                    .copy-card:hover {{ box-shadow: 0 2px 8px rgba(0,0,0,0.08); }}
+                    .copy-card .text {{ word-break: break-word; flex: 1; }}
+                    .copy-card .copy-btn {{
+                        flex-shrink: 0; display: flex; flex-direction: column;
+                        align-items: center; gap: 1px; opacity: 0.6; transition: opacity 0.15s;
                     }}
+                    .copy-card:hover .copy-btn {{ opacity: 1; }}
+                    .copy-btn span {{ font-size: 18px; }}
+                    .copy-btn p {{ font-size: 8px; font-weight: 500; margin: 0; }}
+                    .sku-card {{ background: #f0f6ff; border: 1.5px solid #d0e3ff; }}
+                    .sku-card .text {{ font-size: 18px; font-weight: 700; color: #1a5ed1; letter-spacing: 0.5px; }}
+                    .sku-card .copy-btn {{ color: #1a5ed1; }}
+                    .sku-card .copy-btn p {{ color: #7aabf0; }}
+                    .name-card {{ background: #f0faf2; border: 1.5px solid #c8e6cc; }}
+                    .name-card .text {{ font-size: 15px; font-weight: 600; color: #1b6e2a; }}
+                    .name-card .copy-btn {{ color: #1b6e2a; }}
+                    .name-card .copy-btn p {{ color: #6ebb7e; }}
+                    .desc-card {{ background: #faf8f0; border: 1.5px solid #e6dfc8; }}
+                    .desc-card .text {{ font-size: 14px; font-weight: 500; color: #5a4e2b; }}
+                    .desc-card .copy-btn {{ color: #5a4e2b; }}
+                    .desc-card .copy-btn p {{ color: #b3a67a; }}
+                    .breakdown {{ margin-top: 4px; }}
+                    .breakdown-row {{
+                        display: flex; align-items: center; gap: 8px;
+                        padding: 4px 0; font-size: 13px; color: #555;
+                    }}
+                    .breakdown-code {{
+                        background: #eef2f7; color: #3366aa; padding: 2px 8px;
+                        border-radius: 4px; font-size: 12px; font-weight: 600;
+                        font-family: 'SF Mono', 'Fira Code', monospace; min-width: 28px; text-align: center;
+                    }}
+                    .qr-row {{
+                        display: flex; align-items: center; gap: 16px; margin-top: 6px;
+                    }}
+                    .qr-row img {{ width: 64px; height: 64px; border-radius: 6px; }}
+                    .dl-btn {{
+                        display: inline-flex; align-items: center; gap: 5px;
+                        background: #f4f6f8; border: 1px solid #dde1e6; border-radius: 8px;
+                        padding: 8px 14px; text-decoration: none; color: #444;
+                        font-size: 12px; font-weight: 500; transition: background 0.15s;
+                    }}
+                    .dl-btn:hover {{ background: #e8ecf0; }}
                 </style>
-                <div id="sku-container" onclick="copySKU()" style="
-                    background: #e8f4fd;
-                    border: 1px solid #c5dff0;
-                    border-radius: 12px;
-                    padding: 16px 20px;
-                    display: inline-flex;
-                    align-items: center;
-                    gap: 20px;
-                    cursor: pointer;
-                    margin: 8px;
-                    box-sizing: border-box;
-                    min-width: 200px;
-                    max-width: 100%;
-                    position: relative;
-                ">
-                    <div class="pulse-dot"></div>
-                    <span style="
-                        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-                        font-size: 17px;
-                        font-weight: 600;
-                        color: #1a73e8;
-                        word-break: break-all;
-                    ">{sku}</span>
-                    <div id="copy-area" style="text-align: center; color: #1a73e8; flex-shrink: 0;">
-                        <span id="copy-icon" class="material-symbols-outlined" style="font-size: 20px;">content_copy</span>
-                        <p id="copy-text" style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 9px; color: #5a9bd5; margin: 2px 0 0 0;">Click to Copy</p>
+
+                <div style="display: flex; flex-direction: column; gap: 16px;">
+                    <!-- SKU -->
+                    <div>
+                        <div class="section-label">Generated SKU</div>
+                        <div class="copy-card sku-card" onclick="copyText('{sku}', 'sku')">
+                            <div class="text">{sku}</div>
+                            <div class="copy-btn">
+                                <span id="sku-icon" class="material-symbols-outlined">content_copy</span>
+                                <p id="sku-label">Click to Copy</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Item Name -->
+                    <div>
+                        <div class="section-label">Item Name</div>
+                        {'<div class="copy-card name-card" onclick="copyText(\\x27' + escaped_name + '\\x27, \\x27name\\x27)"><div class="text">' + mapped_name + '</div><div class="copy-btn"><span id="name-icon" class="material-symbols-outlined">content_copy</span><p id="name-label">Click to Copy</p></div></div>' if mapped_name else '<div style="color: #bbb; font-size: 13px; font-style: italic; padding: 8px 0;">Set Tally Name mappings in Settings</div>'}
+                    </div>
+
+                    <!-- Item Description -->
+                    <div>
+                        <div class="section-label">Item Description</div>
+                        {'<div class="copy-card desc-card" onclick="copyText(\\x27' + escaped_desc + '\\x27, \\x27desc\\x27)"><div class="text">' + mapped_desc + '</div><div class="copy-btn"><span id="desc-icon" class="material-symbols-outlined">content_copy</span><p id="desc-label">Click to Copy</p></div></div>' if mapped_desc else '<div style="color: #bbb; font-size: 13px; font-style: italic; padding: 8px 0;">Set Description mappings in Settings</div>'}
+                    </div>
+
+                    <!-- SKU Breakdown -->
+                    <div>
+                        <div class="section-label">SKU Breakdown</div>
+                        <div class="breakdown">
+                            {''.join(f'<div class="breakdown-row"><span class="breakdown-code">{item["code"]}</span> {item["name"]}</div>' for item in all_breakdown_items)}
+                        </div>
+                    </div>
+
+                    <!-- QR Code -->
+                    <div>
+                        <div class="section-label">QR Code</div>
+                        <div class="qr-row">
+                            <img src="data:image/png;base64,{qr_base64}">
+                            <a class="dl-btn" href="data:image/png;base64,{qr_download_base64}" download="{sku}_QR.png">
+                                <span class="material-symbols-outlined" style="font-size: 16px;">download</span>
+                                Download PNG
+                            </a>
+                        </div>
                     </div>
                 </div>
+
                 <script>
-                function copySKU() {{
-                    navigator.clipboard.writeText("{sku}").then(function() {{
-                        document.getElementById('copy-icon').innerText = 'check_circle';
-                        document.getElementById('copy-icon').style.color = '#34a853';
-                        document.getElementById('copy-text').innerText = 'Copied!';
-                        document.getElementById('copy-text').style.color = '#34a853';
+                function copyText(text, id) {{
+                    navigator.clipboard.writeText(text).then(function() {{
+                        var icon = document.getElementById(id + '-icon');
+                        var label = document.getElementById(id + '-label');
+                        icon.innerText = 'check_circle';
+                        label.innerText = 'Copied!';
                         setTimeout(function() {{
-                            document.getElementById('copy-icon').innerText = 'content_copy';
-                            document.getElementById('copy-icon').style.color = '#1a73e8';
-                            document.getElementById('copy-text').innerText = 'Click to Copy';
-                            document.getElementById('copy-text').style.color = '#5a9bd5';
+                            icon.innerText = 'content_copy';
+                            label.innerText = 'Click to Copy';
                         }}, 2000);
                     }});
                 }}
                 </script>
                 """
-                st.components.v1.html(sku_html, height=95)
-                
-                # 2) Item Name & Description (auto-generated from mappings)
-                mapped_name, mapped_desc = generate_mapped_name_and_description(sel, ordered_fields(fields), chosen, fittings_selected)
 
-                st.markdown("<p class='subheading'>Item Name</p>", unsafe_allow_html=True)
-                if mapped_name:
-                    name_html = f"""
-                    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet" />
-                    <div onclick="copyName()" style="
-                        background: #f0faf0; border: 1px solid #c8e6c9; border-radius: 12px;
-                        padding: 12px 16px; display: inline-flex; align-items: center; gap: 16px;
-                        cursor: pointer; max-width: 100%; position: relative;
-                    ">
-                        <span style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-                            font-size: 15px; font-weight: 600; color: #2e7d32; word-break: break-word;
-                        ">{mapped_name}</span>
-                        <div style="text-align: center; color: #2e7d32; flex-shrink: 0;">
-                            <span id="name-copy-icon" class="material-symbols-outlined" style="font-size: 18px;">content_copy</span>
-                            <p id="name-copy-text" style="font-family: -apple-system, BlinkMacSystemFont, sans-serif; font-size: 9px; color: #66bb6a; margin: 2px 0 0 0;">Click to Copy</p>
-                        </div>
-                    </div>
-                    <script>
-                    function copyName() {{
-                        navigator.clipboard.writeText("{mapped_name}").then(function() {{
-                            document.getElementById('name-copy-icon').innerText = 'check_circle';
-                            document.getElementById('name-copy-text').innerText = 'Copied!';
-                            setTimeout(function() {{
-                                document.getElementById('name-copy-icon').innerText = 'content_copy';
-                                document.getElementById('name-copy-text').innerText = 'Click to Copy';
-                            }}, 2000);
-                        }});
-                    }}
-                    </script>
-                    """
-                    st.components.v1.html(name_html, height=70)
-                else:
-                    st.markdown("<p style='color: #999; font-size: 13px; font-style: italic;'>Set Tally Name mappings in Settings to auto-generate</p>", unsafe_allow_html=True)
+                total_items = len(all_breakdown_items)
+                card_height = 370 + (total_items * 28)
+                if mapped_desc and len(mapped_desc) > 80:
+                    card_height += 30
+                st.components.v1.html(output_html, height=card_height)
 
-                st.markdown("<div style='margin-top: 10px;'></div>", unsafe_allow_html=True)
-
-                st.markdown("<p class='subheading'>Item Description</p>", unsafe_allow_html=True)
-                if mapped_desc:
-                    escaped_desc = mapped_desc.replace("'", "\\'").replace("`", "")
-                    desc_html = f"""
-                    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet" />
-                    <div onclick="copyDesc()" style="
-                        background: #e8f4fd; border: 1px solid #c5dff0; border-radius: 12px;
-                        padding: 12px 16px; display: inline-flex; align-items: center; gap: 16px;
-                        cursor: pointer; max-width: 100%; position: relative;
-                    ">
-                        <span style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-                            font-size: 15px; color: #1a73e8; word-break: break-word;
-                        ">{mapped_desc}</span>
-                        <div style="text-align: center; color: #1a73e8; flex-shrink: 0;">
-                            <span id="desc-copy-icon" class="material-symbols-outlined" style="font-size: 18px;">content_copy</span>
-                            <p id="desc-copy-text" style="font-family: -apple-system, BlinkMacSystemFont, sans-serif; font-size: 9px; color: #5a9bd5; margin: 2px 0 0 0;">Click to Copy</p>
-                        </div>
-                    </div>
-                    <script>
-                    function copyDesc() {{
-                        navigator.clipboard.writeText('{escaped_desc}').then(function() {{
-                            document.getElementById('desc-copy-icon').innerText = 'check_circle';
-                            document.getElementById('desc-copy-text').innerText = 'Copied!';
-                            setTimeout(function() {{
-                                document.getElementById('desc-copy-icon').innerText = 'content_copy';
-                                document.getElementById('desc-copy-text').innerText = 'Click to Copy';
-                            }}, 2000);
-                        }});
-                    }}
-                    </script>
-                    """
-                    st.components.v1.html(desc_html, height=90)
-                else:
-                    st.markdown("<p style='color: #999; font-size: 13px; font-style: italic;'>Set Description mappings in Settings to auto-generate</p>", unsafe_allow_html=True)
-
-                st.markdown("<div style='margin-top: 15px;'></div>", unsafe_allow_html=True)
-
-                # 5) SKU Breakdown
-                st.markdown("<p class='subheading'>SKU Breakdown</p>", unsafe_allow_html=True)
-                
-                breakdown_html = "<div style='font-family: -apple-system, BlinkMacSystemFont, sans-serif; font-size: 13px; color: #555; line-height: 1.8;'>"
-                for item in all_breakdown_items:
-                    breakdown_html += f"<div><code style='background: #f0f0f0; padding: 2px 6px; border-radius: 4px; font-size: 12px;'>{item['code']}</code> - {item['name']}</div>"
-                breakdown_html += "</div>"
-                st.markdown(breakdown_html, unsafe_allow_html=True)
-
-                st.markdown("<div style='margin-top: 15px;'></div>", unsafe_allow_html=True)
-                
-                # 6) Generated QR Code
-                st.markdown("<p class='subheading'>Generated QR Code</p>", unsafe_allow_html=True)
-                
-                qr_base64 = get_qr_code_base64(sku)
-                
-                qr_buffer = generate_qr_code(sku, size=300)
-                qr_download_base64 = base64.b64encode(qr_buffer.getvalue()).decode()
-                
-                qr_html = f"""
-                <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet" />
-                <style>
-                    * {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }}
-                    html, body {{ margin: 0; padding: 0; overflow: visible; }}
-                </style>
-                <div style="
-                    background: white;
-                    border: 1px solid #e0e0e0;
-                    border-radius: 12px;
-                    padding: 16px;
-                    display: inline-flex;
-                    align-items: center;
-                    gap: 16px;
-                    margin: 8px;
-                    box-sizing: border-box;
-                ">
-                    <img src="data:image/png;base64,{qr_base64}" style="width: 70px; height: 70px;">
-                    <a href="data:image/png;base64,{qr_download_base64}" 
-                       download="{sku}_QR.png" 
-                       style="
-                           display: inline-flex;
-                           align-items: center;
-                           gap: 5px;
-                           background: #f8f9fa;
-                           border: 1px solid #e0e0e0;
-                           border-radius: 6px;
-                           padding: 8px 12px;
-                           text-decoration: none;
-                           color: #333;
-                           font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-                           font-size: 12px;
-                           font-weight: 500;
-                           cursor: pointer;
-                       ">
-                        <span class="material-symbols-outlined" style="font-size: 16px; color: #1a73e8;">download</span>
-                        Download PNG
-                    </a>
-                </div>
-                """
-                st.components.v1.html(qr_html, height=130)
-                
-                # 7) Save to History
-                st.markdown("<div style='margin-top: 15px;'></div>", unsafe_allow_html=True)
-                sku_description = st.session_state.get("ai_description", "") or " - ".join([item['name'] for item in all_breakdown_items])
+                sku_description = mapped_desc or " - ".join([item['name'] for item in all_breakdown_items])
                 if st.button("💾 Save to History", key="save_history", use_container_width=False):
                     add_to_sku_history(sku, sku_description, cat)
-                    st.toast(f"✅ Saved: {sku}")
+                    st.toast(f"Saved: {sku}")
                     st.rerun()
                 
             else:
