@@ -197,6 +197,43 @@ def generate_product_name_and_description(breakdown_items, category_name, sku, e
 # ==================================================
 # HELPERS
 # ==================================================
+def generate_mapped_name_and_description(sel, ordered_field_names, chosen, fittings_selected):
+    """Build item name and description deterministically from tally_name/description mappings."""
+    tally_parts = []
+    desc_parts = []
+    for k in ordered_field_names:
+        s = sel.get(k)
+        if not s or not s.get("code"):
+            continue
+        if k.lower() == "fittings":
+            continue
+        tn = s.get("tally_name", "").strip()
+        if tn:
+            tally_parts.append(tn)
+        dd = s.get("description", "").strip()
+        if dd:
+            desc_parts.append(dd)
+
+    item_name = ",".join(tally_parts)
+
+    if chosen:
+        extras_tally = [c.get("tally_name", "").strip() or c.get("name", "") for c in chosen]
+        item_name += " + " + ",".join(extras_tally)
+
+    if fittings_selected:
+        item_name += " + F"
+
+    item_desc = " ".join(desc_parts)
+
+    if chosen:
+        extras_desc = [c.get("tally_name", "").strip() or c.get("name", "") for c in chosen]
+        item_desc += " + Extras: " + ",".join(extras_desc)
+
+    if fittings_selected:
+        item_desc += " + Fittings"
+
+    return item_name, item_desc
+
 def get_option_label(o):
     """Format option for display in selectbox."""
     return f"{o['code']} : {o['name']}"
@@ -253,14 +290,20 @@ def normalize_option_df(data):
         data: List of option dictionaries
         
     Returns:
-        DataFrame with code, name, order columns
+        DataFrame with code, name, tally_name, description, order columns
     """
-    df = pd.DataFrame(data or [], columns=["code", "name", "order"])
+    cols = ["code", "name", "tally_name", "description", "order"]
+    df = pd.DataFrame(data or [], columns=cols)
     if df.empty:
-        df = pd.DataFrame(columns=["code", "name", "order"])
+        df = pd.DataFrame(columns=cols)
+    for c in ["tally_name", "description"]:
+        if c not in df.columns:
+            df[c] = ""
+    df["tally_name"] = df["tally_name"].fillna("")
+    df["description"] = df["description"].fillna("")
     if df["order"].isnull().all():
         df["order"] = range(1, len(df) + 1)
-    return df[["code", "name", "order"]]
+    return df[cols]
 
 def normalize_extras_df(data):
     """
@@ -270,14 +313,20 @@ def normalize_extras_df(data):
         data: List of extra dictionaries
         
     Returns:
-        DataFrame with code, name, and order columns
+        DataFrame with code, name, tally_name, description, order columns
     """
-    df = pd.DataFrame(data or [], columns=["code", "name", "order"])
+    cols = ["code", "name", "tally_name", "description", "order"]
+    df = pd.DataFrame(data or [], columns=cols)
     if df.empty:
-        df = pd.DataFrame(columns=["code", "name", "order"])
+        df = pd.DataFrame(columns=cols)
+    for c in ["tally_name", "description"]:
+        if c not in df.columns:
+            df[c] = ""
+    df["tally_name"] = df["tally_name"].fillna("")
+    df["description"] = df["description"].fillna("")
     if "order" not in df.columns or df["order"].isnull().all():
         df["order"] = range(1, len(df) + 1)
-    return df[["code", "name", "order"]]
+    return df[cols]
 
 def generate_full_matrix(cat_data):
     """
@@ -722,7 +771,7 @@ def home():
                         help=f"Select {mf_name}",
                         label_visibility="collapsed"
                     )
-                    sel[mf_name] = {"code": mf_selection["code"], "name": mf_selection["name"]}
+                    sel[mf_name] = {"code": mf_selection["code"], "name": mf_selection["name"], "tally_name": mf_selection.get("tally_name", ""), "description": mf_selection.get("description", "")}
                     selected_machine_code = mf_selection["code"]
 
             # Render remaining fields, filtered by selected machine
@@ -737,7 +786,7 @@ def home():
                 is_text = opts and opts[0].get("type") == "text"
                 if is_text:
                     text_val = st.text_input(f, help=f"Enter {f}", placeholder=f"Enter {f}", label_visibility="collapsed")
-                    sel[f] = {"code": text_val, "name": text_val}
+                    sel[f] = {"code": text_val, "name": text_val, "tally_name": text_val, "description": text_val}
                 else:
                     filtered_opts = filter_for_machine(opts, selected_machine_code) if selected_machine_code else opts
                     if filtered_opts:
@@ -749,7 +798,7 @@ def home():
                             help=f"Select {f}",
                             label_visibility="collapsed"
                         )
-                        sel[f] = {"code": o["code"], "name": o["name"]}
+                        sel[f] = {"code": o["code"], "name": o["name"], "tally_name": o.get("tally_name", ""), "description": o.get("description", "")}
         
         st.markdown("<div style='margin-top: 20px;'></div>", unsafe_allow_html=True)
         
@@ -776,7 +825,7 @@ def home():
                 if selected_name != "None":
                     for e in sorted_extras:
                         if e["name"] == selected_name and e.get("code"):
-                            chosen.append({"code": e["code"], "name": e["name"]})
+                            chosen.append({"code": e["code"], "name": e["name"], "tally_name": e.get("tally_name", ""), "description": e.get("description", "")})
                             break
             else:
                 num_cols = 3
@@ -792,7 +841,7 @@ def home():
                             with cols[col_idx]:
                                 if st.checkbox(e["name"], key=f"extra_{extra_idx}"):
                                     if e.get("code"):
-                                        chosen.append({"code": e["code"], "name": e["name"]})
+                                        chosen.append({"code": e["code"], "name": e["name"], "tally_name": e.get("tally_name", ""), "description": e.get("description", "")})
         else:
             if extras and selected_machine_code:
                 st.info("No extras available for this machine")
@@ -897,10 +946,11 @@ def home():
                 """
                 st.components.v1.html(sku_html, height=95)
                 
-                # 2) Item Name
+                # 2) Item Name & Description (auto-generated from mappings)
+                mapped_name, mapped_desc = generate_mapped_name_and_description(sel, ordered_fields(fields), chosen, fittings_selected)
+
                 st.markdown("<p class='subheading'>Item Name</p>", unsafe_allow_html=True)
-                if st.session_state.get("ai_item_name"):
-                    name_text = st.session_state["ai_item_name"]
+                if mapped_name:
                     name_html = f"""
                     <div style="
                         background: #f0faf0;
@@ -911,46 +961,31 @@ def home():
                         font-size: 15px;
                         font-weight: 600;
                         color: #2e7d32;
-                    ">{name_text}</div>
+                    ">{mapped_name}</div>
                     """
                     st.markdown(name_html, unsafe_allow_html=True)
                 else:
-                    st.markdown("<p style='color: #999; font-size: 13px; font-style: italic;'>Click 'Generate Name & Description' below</p>", unsafe_allow_html=True)
+                    st.markdown("<p style='color: #999; font-size: 13px; font-style: italic;'>Set Tally Name mappings in Settings to auto-generate</p>", unsafe_allow_html=True)
 
                 st.markdown("<div style='margin-top: 10px;'></div>", unsafe_allow_html=True)
 
-                # 3) Item Description
                 st.markdown("<p class='subheading'>Item Description</p>", unsafe_allow_html=True)
-                if st.session_state.get("ai_description"):
-                    desc_text = st.session_state["ai_description"]
-                    st.info(desc_text)
+                if mapped_desc:
+                    st.info(mapped_desc)
                 else:
-                    st.markdown("<p style='color: #999; font-size: 13px; font-style: italic;'>Click 'Generate Name & Description' below</p>", unsafe_allow_html=True)
+                    st.markdown("<p style='color: #999; font-size: 13px; font-style: italic;'>Set Description mappings in Settings to auto-generate</p>", unsafe_allow_html=True)
 
                 st.markdown("<div style='margin-top: 10px;'></div>", unsafe_allow_html=True)
 
-                # 4) Generate Name & Description button
-                if ANTHROPIC_API_KEY and breakdown_items:
-                    if st.button("✨ Generate Name & Description", key="gen_name_desc", use_container_width=False):
-                        with st.spinner("Generating..."):
-                            name, desc, err = generate_product_name_and_description(breakdown_items, cat, sku, extras_items=extras_items, fittings_selected=fittings_selected)
-                            if name or desc:
-                                st.session_state["ai_item_name"] = name or ""
-                                st.session_state["ai_description"] = desc or ""
-                                st.rerun()
-                            else:
-                                st.error(f"Failed: {err}")
-
-                    if st.session_state.get("ai_item_name") or st.session_state.get("ai_description"):
-                        copy_all_text = f"{st.session_state.get('ai_item_name', '')}\\n{st.session_state.get('ai_description', '')}"
-                        copy_btn_html = f"""
-                        <button onclick="navigator.clipboard.writeText(`{st.session_state.get('ai_item_name', '')}\\n{st.session_state.get('ai_description', '').replace('`', '')}`); this.innerText='✓ Copied'" 
-                            style="background: #e8f4fd; border: 1px solid #c5dff0; border-radius: 6px; 
-                            padding: 5px 12px; cursor: pointer; color: #1a73e8; font-size: 11px; margin-top: 4px;">
-                            📋 Copy Name & Description
-                        </button>
-                        """
-                        st.components.v1.html(copy_btn_html, height=40)
+                if mapped_name or mapped_desc:
+                    copy_btn_html = f"""
+                    <button onclick="navigator.clipboard.writeText(`{mapped_name}\\n{mapped_desc.replace('`', '')}`); this.innerText='✓ Copied'" 
+                        style="background: #e8f4fd; border: 1px solid #c5dff0; border-radius: 6px; 
+                        padding: 5px 12px; cursor: pointer; color: #1a73e8; font-size: 11px; margin-top: 4px;">
+                        📋 Copy Name & Description
+                    </button>
+                    """
+                    st.components.v1.html(copy_btn_html, height=40)
 
                 st.markdown("<div style='margin-top: 15px;'></div>", unsafe_allow_html=True)
 
@@ -1215,6 +1250,8 @@ def admin():
                         column_config={
                             "code": st.column_config.TextColumn("Code", help="SKU code segment"),
                             "name": st.column_config.TextColumn("Name", help="Display name"),
+                            "tally_name": st.column_config.TextColumn("Tally Name", help="Abbreviation used in Item Name (e.g. FSV, A, ST)"),
+                            "description": st.column_config.TextColumn("Description", help="Full text used in Item Description (e.g. Flat Sand Valve, Automatic)"),
                             "order": st.column_config.NumberColumn("Order", help="Display order")
                         }
                     )
@@ -1242,6 +1279,8 @@ def admin():
                 column_config={
                     "code": st.column_config.TextColumn("Code", help="SKU code for this extra (will be appended to SKU)"),
                     "name": st.column_config.TextColumn("Name", help="Display name shown to users"),
+                    "tally_name": st.column_config.TextColumn("Tally Name", help="Abbreviation used in Item Name (e.g. MS, PG, RV)"),
+                    "description": st.column_config.TextColumn("Description", help="Full text used in Item Description (e.g. Moisture Separator)"),
                     "order": st.column_config.NumberColumn("Order", help="Display order (lower numbers appear first)")
                 }
             )
