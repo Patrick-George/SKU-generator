@@ -996,7 +996,7 @@ def home():
                         cursor: pointer; max-width: 100%; position: relative;
                     ">
                         <span style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-                            font-size: 13px; color: #1a73e8; word-break: break-word;
+                            font-size: 15px; color: #1a73e8; word-break: break-word;
                         ">{mapped_desc}</span>
                         <div style="text-align: center; color: #1a73e8; flex-shrink: 0;">
                             <span id="desc-copy-icon" class="material-symbols-outlined" style="font-size: 18px;">content_copy</span>
