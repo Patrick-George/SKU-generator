@@ -214,7 +214,7 @@ def generate_mapped_name_and_description(sel, ordered_field_names, chosen, fitti
         if dd:
             desc_parts.append(dd)
 
-    item_name = ",".join(tally_parts)
+    item_name = " ".join(tally_parts)
 
     if chosen:
         extras_tally = [c.get("tally_name", "").strip() or c.get("name", "") for c in chosen]
