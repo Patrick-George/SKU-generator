@@ -584,13 +584,24 @@ def render_sidebar_nav(current_page="home"):
         </script>
     """, unsafe_allow_html=True)
     
-    st.markdown("### 🧭 Navigation")
+    st.markdown("""
+        <style>
+        [data-testid="stSidebar"] {
+            background: #fafbfc;
+        }
+        [data-testid="stSidebar"] .block-container {
+            padding-top: 1.5rem;
+        }
+        </style>
+    """, unsafe_allow_html=True)
+    
+    st.markdown("<p style='font-size:13px;font-weight:700;color:#aaa;text-transform:uppercase;letter-spacing:1px;font-family:Inter,sans-serif;'>Navigation</p>", unsafe_allow_html=True)
     
     pages = [
-        ("home", "🏠 SKU Generator"),
-        ("history", "📋 SKU History"),
-        ("decoder", "🔍 SKU Decoder"),
-        ("scanner", "📱 QR Scanner"),
+        ("home", "SKU Generator"),
+        ("history", "SKU History"),
+        ("decoder", "SKU Decoder"),
+        ("scanner", "QR Scanner"),
     ]
     
     for page_id, page_name in pages:
@@ -710,41 +721,87 @@ def home():
     st.markdown("""
         <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
-        .subheading {
-            font-size: 13px;
-            font-weight: 600;
-            color: #888;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            margin-bottom: 8px;
+
+        /* Base font */
+        html, body, [class*="css"] {
             font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
         }
+
+        /* Clean up Streamlit default padding */
+        .block-container { padding-top: 2rem; }
+
+        /* Subheading labels */
+        .subheading {
+            font-size: 11px;
+            font-weight: 700;
+            color: #aaa;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 10px;
+            padding-bottom: 6px;
+            border-bottom: 2px solid #f0f0f0;
+        }
+
+        /* Page title */
         .page-title {
             text-align: center;
-            margin-bottom: 2px;
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            margin-bottom: 0;
             font-weight: 700;
-            font-size: 28px;
+            font-size: 26px;
             color: #1a1a1a;
+            letter-spacing: -0.5px;
         }
+        .page-subtitle {
+            text-align: center;
+            font-size: 13px;
+            color: #aaa;
+            margin-bottom: 8px;
+            font-weight: 400;
+        }
+
+        /* Field labels */
         .config-label {
-            font-size: 12px;
-            color: #888;
-            margin-bottom: 2px;
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            font-size: 11px;
+            font-weight: 600;
+            color: #999;
+            margin-bottom: 3px;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+        }
+
+        /* Streamlit selectbox styling */
+        [data-testid="stSelectbox"] > div > div {
+            border-radius: 8px !important;
+        }
+
+        /* Checkbox styling */
+        [data-testid="stCheckbox"] label {
+            font-size: 13px !important;
+        }
+
+        /* Divider between columns */
+        [data-testid="stHorizontalBlock"] > div:first-child {
+            border-right: 1px solid #eee;
+            padding-right: 2rem;
+        }
+
+        /* Hide default Streamlit header decoration */
+        header[data-testid="stHeader"] {
+            background: transparent;
         }
         </style>
     """, unsafe_allow_html=True)
 
     st.markdown("<h2 class='page-title'>Blastline SKU Configurator</h2>", unsafe_allow_html=True)
+    st.markdown("<p class='page-subtitle'>Configure product specifications and generate SKU codes</p>", unsafe_allow_html=True)
 
     inv = st.session_state["sku_data"]["inventory"]
     if not inv:
         st.warning("No categories available. Please contact admin to set up product categories.")
         return
 
-    # Centered Product Category dropdown - compact width
-    cat_spacer1, cat_col, cat_spacer2 = st.columns([2, 1.5, 2])
+    # Category selector
+    cat_spacer1, cat_col, cat_spacer2 = st.columns([2.5, 1.5, 2.5])
     with cat_col:
         cat = st.selectbox("Product Category", list(inv.keys()), label_visibility="collapsed")
     
@@ -759,66 +816,57 @@ def home():
     sel = {}
     chosen = []
 
-    # Determine machine-selector field and get selected machine code
     mf_name = get_machine_field(cat_data)
     selected_machine_code = None
     
-    st.markdown("<div style='margin-top: 30px;'></div>", unsafe_allow_html=True)
+    st.markdown("<div style='margin-top: 16px;'></div>", unsafe_allow_html=True)
 
-    # Main two-column layout (no divider column - use CSS border instead)
     left_col, right_col = st.columns([1, 1], gap="large")
 
     with left_col:
-        # Configuration Section - larger subheading
         st.markdown("<p class='subheading'>Configuration</p>", unsafe_allow_html=True)
         
-        # Create a narrower container for dropdowns
-        config_inner, config_spacer = st.columns([3, 1])
-        with config_inner:
-            # Render machine-selector field first (always visible)
-            if mf_name in fields:
-                mf_opts = fields[mf_name]["options"]
-                if mf_opts and not mf_opts[0].get("type") == "text":
-                    st.markdown(f"<p class='config-label'>{mf_name}</p>", unsafe_allow_html=True)
-                    mf_selection = st.selectbox(
-                        mf_name,
-                        mf_opts,
-                        format_func=lambda x: f"{x['code']} - {x['name']}",
-                        help=f"Select {mf_name}",
+        if mf_name in fields:
+            mf_opts = fields[mf_name]["options"]
+            if mf_opts and not mf_opts[0].get("type") == "text":
+                st.markdown(f"<p class='config-label'>{mf_name}</p>", unsafe_allow_html=True)
+                mf_selection = st.selectbox(
+                    mf_name,
+                    mf_opts,
+                    format_func=lambda x: f"{x['code']} - {x['name']}",
+                    help=f"Select {mf_name}",
+                    label_visibility="collapsed"
+                )
+                sel[mf_name] = {"code": mf_selection["code"], "name": mf_selection["name"], "tally_name": mf_selection.get("tally_name", ""), "description": mf_selection.get("description", "")}
+                selected_machine_code = mf_selection["code"]
+
+        for f in ordered_fields(fields):
+            if f == mf_name:
+                continue
+            field_machines = fields[f].get("machines", [])
+            if field_machines and selected_machine_code and selected_machine_code not in field_machines:
+                continue
+
+            opts = fields[f]["options"]
+            is_text = opts and opts[0].get("type") == "text"
+            if is_text:
+                st.markdown(f"<p class='config-label'>{f}</p>", unsafe_allow_html=True)
+                text_val = st.text_input(f, help=f"Enter {f}", placeholder=f"Enter {f}", label_visibility="collapsed")
+                sel[f] = {"code": text_val, "name": text_val, "tally_name": text_val, "description": text_val}
+            else:
+                filtered_opts = filter_for_machine(opts, selected_machine_code) if selected_machine_code else opts
+                if filtered_opts:
+                    st.markdown(f"<p class='config-label'>{f}</p>", unsafe_allow_html=True)
+                    o = st.selectbox(
+                        f, 
+                        filtered_opts, 
+                        format_func=lambda x: f"{x['code']} - {x['name']}", 
+                        help=f"Select {f}",
                         label_visibility="collapsed"
                     )
-                    sel[mf_name] = {"code": mf_selection["code"], "name": mf_selection["name"], "tally_name": mf_selection.get("tally_name", ""), "description": mf_selection.get("description", "")}
-                    selected_machine_code = mf_selection["code"]
-
-            # Render remaining fields, filtered by selected machine
-            for f in ordered_fields(fields):
-                if f == mf_name:
-                    continue
-                field_machines = fields[f].get("machines", [])
-                if field_machines and selected_machine_code and selected_machine_code not in field_machines:
-                    continue
-
-                opts = fields[f]["options"]
-                is_text = opts and opts[0].get("type") == "text"
-                if is_text:
-                    text_val = st.text_input(f, help=f"Enter {f}", placeholder=f"Enter {f}", label_visibility="collapsed")
-                    sel[f] = {"code": text_val, "name": text_val, "tally_name": text_val, "description": text_val}
-                else:
-                    filtered_opts = filter_for_machine(opts, selected_machine_code) if selected_machine_code else opts
-                    if filtered_opts:
-                        st.markdown(f"<p class='config-label'>{f}</p>", unsafe_allow_html=True)
-                        o = st.selectbox(
-                            f, 
-                            filtered_opts, 
-                            format_func=lambda x: f"{x['code']} - {x['name']}", 
-                            help=f"Select {f}",
-                            label_visibility="collapsed"
-                        )
-                        sel[f] = {"code": o["code"], "name": o["name"], "tally_name": o.get("tally_name", ""), "description": o.get("description", "")}
+                    sel[f] = {"code": o["code"], "name": o["name"], "tally_name": o.get("tally_name", ""), "description": o.get("description", "")}
         
         st.markdown("<div style='margin-top: 20px;'></div>", unsafe_allow_html=True)
-        
-        # Extras Section - larger subheading
         st.markdown("<p class='subheading'>Extras</p>", unsafe_allow_html=True)
         
         # Filter extras by selected machine
@@ -1030,11 +1078,10 @@ def home():
             else:
                 st.info("Select configuration to generate SKU")
     
-    # Footer
-    st.markdown("<div style='margin-top: 50px;'></div>", unsafe_allow_html=True)
+    st.markdown("<div style='margin-top: 40px;'></div>", unsafe_allow_html=True)
     st.markdown(
-        "<div style='text-align:center;color:#aaa;font-size:0.8em;'>"
-        "Developed by <strong>Blastline India Pvt Ltd</strong>"
+        "<div style='text-align:center;color:#ccc;font-size:11px;font-family:Inter,sans-serif;letter-spacing:0.3px;'>"
+        "Blastline India Pvt Ltd"
         "</div>",
         unsafe_allow_html=True
     )
