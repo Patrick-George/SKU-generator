@@ -779,7 +779,7 @@ def home():
                             chosen.append({"code": e["code"], "name": e["name"]})
                             break
             else:
-                num_cols = 5
+                num_cols = 3
                 total_extras = len(sorted_extras)
                 num_rows = (total_extras + num_cols - 1) // num_cols
                 
