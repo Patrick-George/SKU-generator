@@ -963,7 +963,7 @@ def home():
                         ">{mapped_name}</span>
                         <div style="text-align: center; color: #2e7d32; flex-shrink: 0;">
                             <span id="name-copy-icon" class="material-symbols-outlined" style="font-size: 18px;">content_copy</span>
-                            <p id="name-copy-text" style="font-family: -apple-system, BlinkMacSystemFont, sans-serif; font-size: 9px; color: #66bb6a; margin: 2px 0 0 0;">Copy</p>
+                            <p id="name-copy-text" style="font-family: -apple-system, BlinkMacSystemFont, sans-serif; font-size: 9px; color: #66bb6a; margin: 2px 0 0 0;">Click to Copy</p>
                         </div>
                     </div>
                     <script>
@@ -973,7 +973,7 @@ def home():
                             document.getElementById('name-copy-text').innerText = 'Copied!';
                             setTimeout(function() {{
                                 document.getElementById('name-copy-icon').innerText = 'content_copy';
-                                document.getElementById('name-copy-text').innerText = 'Copy';
+                                document.getElementById('name-copy-text').innerText = 'Click to Copy';
                             }}, 2000);
                         }});
                     }}
@@ -1000,7 +1000,7 @@ def home():
                         ">{mapped_desc}</span>
                         <div style="text-align: center; color: #1a73e8; flex-shrink: 0;">
                             <span id="desc-copy-icon" class="material-symbols-outlined" style="font-size: 18px;">content_copy</span>
-                            <p id="desc-copy-text" style="font-family: -apple-system, BlinkMacSystemFont, sans-serif; font-size: 9px; color: #5a9bd5; margin: 2px 0 0 0;">Copy</p>
+                            <p id="desc-copy-text" style="font-family: -apple-system, BlinkMacSystemFont, sans-serif; font-size: 9px; color: #5a9bd5; margin: 2px 0 0 0;">Click to Copy</p>
                         </div>
                     </div>
                     <script>
@@ -1010,7 +1010,7 @@ def home():
                             document.getElementById('desc-copy-text').innerText = 'Copied!';
                             setTimeout(function() {{
                                 document.getElementById('desc-copy-icon').innerText = 'content_copy';
-                                document.getElementById('desc-copy-text').innerText = 'Copy';
+                                document.getElementById('desc-copy-text').innerText = 'Click to Copy';
                             }}, 2000);
                         }});
                     }}
