@@ -952,18 +952,34 @@ def home():
                 st.markdown("<p class='subheading'>Item Name</p>", unsafe_allow_html=True)
                 if mapped_name:
                     name_html = f"""
-                    <div style="
-                        background: #f0faf0;
-                        border: 1px solid #c8e6c9;
-                        border-radius: 8px;
-                        padding: 12px 16px;
-                        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-                        font-size: 15px;
-                        font-weight: 600;
-                        color: #2e7d32;
-                    ">{mapped_name}</div>
+                    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet" />
+                    <div onclick="copyName()" style="
+                        background: #f0faf0; border: 1px solid #c8e6c9; border-radius: 12px;
+                        padding: 12px 16px; display: inline-flex; align-items: center; gap: 16px;
+                        cursor: pointer; max-width: 100%; position: relative;
+                    ">
+                        <span style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                            font-size: 15px; font-weight: 600; color: #2e7d32; word-break: break-word;
+                        ">{mapped_name}</span>
+                        <div style="text-align: center; color: #2e7d32; flex-shrink: 0;">
+                            <span id="name-copy-icon" class="material-symbols-outlined" style="font-size: 18px;">content_copy</span>
+                            <p id="name-copy-text" style="font-family: -apple-system, BlinkMacSystemFont, sans-serif; font-size: 9px; color: #66bb6a; margin: 2px 0 0 0;">Copy</p>
+                        </div>
+                    </div>
+                    <script>
+                    function copyName() {{
+                        navigator.clipboard.writeText("{mapped_name}").then(function() {{
+                            document.getElementById('name-copy-icon').innerText = 'check_circle';
+                            document.getElementById('name-copy-text').innerText = 'Copied!';
+                            setTimeout(function() {{
+                                document.getElementById('name-copy-icon').innerText = 'content_copy';
+                                document.getElementById('name-copy-text').innerText = 'Copy';
+                            }}, 2000);
+                        }});
+                    }}
+                    </script>
                     """
-                    st.markdown(name_html, unsafe_allow_html=True)
+                    st.components.v1.html(name_html, height=70)
                 else:
                     st.markdown("<p style='color: #999; font-size: 13px; font-style: italic;'>Set Tally Name mappings in Settings to auto-generate</p>", unsafe_allow_html=True)
 
@@ -971,21 +987,38 @@ def home():
 
                 st.markdown("<p class='subheading'>Item Description</p>", unsafe_allow_html=True)
                 if mapped_desc:
-                    st.info(mapped_desc)
+                    escaped_desc = mapped_desc.replace("'", "\\'").replace("`", "")
+                    desc_html = f"""
+                    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet" />
+                    <div onclick="copyDesc()" style="
+                        background: #e8f4fd; border: 1px solid #c5dff0; border-radius: 12px;
+                        padding: 12px 16px; display: inline-flex; align-items: center; gap: 16px;
+                        cursor: pointer; max-width: 100%; position: relative;
+                    ">
+                        <span style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                            font-size: 13px; color: #1a73e8; word-break: break-word;
+                        ">{mapped_desc}</span>
+                        <div style="text-align: center; color: #1a73e8; flex-shrink: 0;">
+                            <span id="desc-copy-icon" class="material-symbols-outlined" style="font-size: 18px;">content_copy</span>
+                            <p id="desc-copy-text" style="font-family: -apple-system, BlinkMacSystemFont, sans-serif; font-size: 9px; color: #5a9bd5; margin: 2px 0 0 0;">Copy</p>
+                        </div>
+                    </div>
+                    <script>
+                    function copyDesc() {{
+                        navigator.clipboard.writeText('{escaped_desc}').then(function() {{
+                            document.getElementById('desc-copy-icon').innerText = 'check_circle';
+                            document.getElementById('desc-copy-text').innerText = 'Copied!';
+                            setTimeout(function() {{
+                                document.getElementById('desc-copy-icon').innerText = 'content_copy';
+                                document.getElementById('desc-copy-text').innerText = 'Copy';
+                            }}, 2000);
+                        }});
+                    }}
+                    </script>
+                    """
+                    st.components.v1.html(desc_html, height=90)
                 else:
                     st.markdown("<p style='color: #999; font-size: 13px; font-style: italic;'>Set Description mappings in Settings to auto-generate</p>", unsafe_allow_html=True)
-
-                st.markdown("<div style='margin-top: 10px;'></div>", unsafe_allow_html=True)
-
-                if mapped_name or mapped_desc:
-                    copy_btn_html = f"""
-                    <button onclick="navigator.clipboard.writeText(`{mapped_name}\\n{mapped_desc.replace('`', '')}`); this.innerText='✓ Copied'" 
-                        style="background: #e8f4fd; border: 1px solid #c5dff0; border-radius: 6px; 
-                        padding: 5px 12px; cursor: pointer; color: #1a73e8; font-size: 11px; margin-top: 4px;">
-                        📋 Copy Name & Description
-                    </button>
-                    """
-                    st.components.v1.html(copy_btn_html, height=40)
 
                 st.markdown("<div style='margin-top: 15px;'></div>", unsafe_allow_html=True)
 
