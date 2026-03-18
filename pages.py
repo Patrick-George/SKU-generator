@@ -977,10 +977,9 @@ def admin():
         if st.button("☁️ Save to Cloud", type="primary"):
             with st.spinner("Saving to cloud..."):
                 if GithubStorage().save(st.session_state["sku_data"]):
-                    show_success("Configuration saved to cloud successfully!")
+                    st.toast("✅ Saved to cloud!", icon="☁️")
                 else:
                     show_error("Failed to save to cloud. Check your connection and credentials.")
-            go("home")
 
 
 # ==================================================
