@@ -11,7 +11,7 @@ from io import BytesIO
 # CONSTANTS
 # ==================================================
 COPY_BOX_HEIGHT = 160
-DEFAULT_SEPARATOR = "-"
+DEFAULT_SEPARATOR = ""
 DEFAULT_EXTRAS_MODE = "Multiple"
 EXTRAS_PER_PAGE = 8
 MAX_SKU_HISTORY = 15
