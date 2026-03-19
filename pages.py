@@ -423,6 +423,10 @@ def home():
 def login():
     """Admin login page."""
 
+    if st.session_state.get("admin_authenticated"):
+        go("admin")
+        return
+
     col1, col2, col3 = st.columns([1, 2, 1])
 
     with col2:
@@ -434,6 +438,7 @@ def login():
         with c1:
             if st.button("Login", use_container_width=True):
                 if pw == "admin123":
+                    st.session_state["admin_authenticated"] = True
                     go("admin")
                 else:
                     show_error("Invalid password. Please try again.")
@@ -452,6 +457,10 @@ def admin():
     col1, col2, col3 = st.columns([1, 3, 1])
     with col1:
         if st.button("← Back to Home"):
+            go("home")
+    with col3:
+        if st.button("🔓 Logout"):
+            st.session_state["admin_authenticated"] = False
             go("home")
 
     st.markdown("---")

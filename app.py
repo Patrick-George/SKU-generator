@@ -33,6 +33,9 @@ if "confirm_delete_field" not in st.session_state:
 if "sku_history" not in st.session_state:
     st.session_state["sku_history"] = []
 
+if "admin_authenticated" not in st.session_state:
+    st.session_state["admin_authenticated"] = False
+
 # ==================================================
 # ROUTER
 # ==================================================
