@@ -112,7 +112,10 @@ def home():
 
     cat_spacer1, cat_col, cat_spacer2 = st.columns([2.5, 1.5, 2.5])
     with cat_col:
-        cat = st.selectbox("Product Category", list(inv.keys()), label_visibility="collapsed")
+        cat_list = list(inv.keys())
+        stored = st.session_state.get("selected_category")
+        idx = cat_list.index(stored) if stored in cat_list else 0
+        cat = st.selectbox("Product Category", cat_list, index=idx, key="selected_category", label_visibility="collapsed")
 
     cat_data = inv[cat]
     normalize_fields(cat_data)
