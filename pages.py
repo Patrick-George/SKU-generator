@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import json
 import base64
+import os
 
 from storage import GithubStorage
 from helpers import (
@@ -1373,3 +1374,50 @@ def scanner_page():
     - The SKU will be detected automatically with a beep sound
     - Click **Copy SKU** or **Decode SKU** to see the breakdown
     """)
+
+
+# ==================================================
+# CATEGORY - ITEM PAIRS PAGE
+# ==================================================
+def category_items_page():
+    """Category and Item pairs reference page."""
+    with st.sidebar:
+        render_sidebar_nav("category_items")
+
+    st.markdown("<h2 style='text-align: center;'>📂 Category - Item Pairs</h2>", unsafe_allow_html=True)
+    st.markdown("<p style='text-align: center; color: #666;'>Reference table of product categories and their item groups</p>", unsafe_allow_html=True)
+
+    st.markdown("---")
+
+    json_path = os.path.join(os.path.dirname(__file__), "category_items.json")
+    try:
+        with open(json_path, "r") as f:
+            data = json.load(f)
+    except FileNotFoundError:
+        st.error("category_items.json not found.")
+        return
+
+    df = pd.DataFrame(data)
+    df.columns = ["Category", "Group / Under"]
+
+    search = st.text_input("Search", placeholder="Filter by category or item...", label_visibility="collapsed")
+    if search:
+        mask = df.apply(lambda row: search.lower() in row.str.lower().str.cat(sep=" "), axis=1)
+        df = df[mask]
+
+    categories = df["Category"].unique().tolist()
+
+    for cat in categories:
+        cat_df = df[df["Category"] == cat]
+        with st.expander(f"**{cat}** ({len(cat_df)} items)", expanded=True):
+            for _, row in cat_df.iterrows():
+                st.markdown(f"- {row['Group / Under']}")
+
+    st.markdown("---")
+
+    st.markdown(
+        "<div style='text-align:center;color:#ccc;font-size:11px;font-family:Inter,sans-serif;letter-spacing:0.3px;'>"
+        "Blastline India Pvt Ltd"
+        "</div>",
+        unsafe_allow_html=True
+    )

@@ -1,6 +1,6 @@
 import streamlit as st
 from storage import GithubStorage
-from pages import home, login, admin, history_page, decoder_page, scanner_page
+from pages import home, login, admin, history_page, decoder_page, scanner_page, category_items_page
 
 # ==================================================
 # SETUP
@@ -51,3 +51,5 @@ elif st.session_state["page"] == "decoder":
     decoder_page()
 elif st.session_state["page"] == "scanner":
     scanner_page()
+elif st.session_state["page"] == "category_items":
+    category_items_page()

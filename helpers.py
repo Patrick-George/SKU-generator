@@ -458,6 +458,7 @@ def render_sidebar_nav(current_page="home"):
         ("history", "SKU History"),
         ("decoder", "SKU Decoder"),
         ("scanner", "QR Scanner"),
+        ("category_items", "Category - Item Pairs"),
     ]
 
     for page_id, page_name in pages:
