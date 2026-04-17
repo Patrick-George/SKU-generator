@@ -406,11 +406,7 @@ def home():
                         </div>
                     </div>
 
-                    <!-- Item Name -->
-                    <div>
-                        <div class="section-label">Item Name</div>
-                        {name_card_html}
-                    </div>
+                    {'<!-- Item Name --><div><div class="section-label">Item Name</div>' + name_card_html + '</div>' if cat != "Blast Machine" else ''}
 
                     <!-- Item Description -->
                     <div>
@@ -457,6 +453,8 @@ def home():
 
                 total_items = len(all_breakdown_items)
                 card_height = 370 + (total_items * 28)
+                if cat == "Blast Machine":
+                    card_height -= 80
                 if mapped_desc and len(mapped_desc) > 80:
                     card_height += 30
                 st.components.v1.html(output_html, height=card_height)
