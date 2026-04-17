@@ -26,6 +26,8 @@ from helpers import (
     show_success,
     show_error,
     show_info,
+    format_fitting_option,
+    parse_fitting_parts,
 )
 
 
@@ -100,6 +102,39 @@ def home():
         header[data-testid="stHeader"] {
             background: transparent;
         }
+
+        .fitting-breakdown {
+            background: #f8f9fb;
+            border: 1px solid #e8eaed;
+            border-radius: 8px;
+            padding: 10px 14px;
+            margin-top: 6px;
+            margin-bottom: 4px;
+            display: flex;
+            gap: 16px;
+            font-size: 12px;
+            font-family: 'Inter', sans-serif;
+        }
+        .fitting-part {
+            flex: 1;
+        }
+        .fitting-part-label {
+            font-weight: 700;
+            color: #888;
+            text-transform: uppercase;
+            font-size: 10px;
+            letter-spacing: 0.5px;
+            margin-bottom: 2px;
+        }
+        .fitting-part-value {
+            color: #333;
+            font-weight: 500;
+        }
+        .fitting-divider {
+            width: 1px;
+            background: #dde1e6;
+            align-self: stretch;
+        }
         </style>
     """, unsafe_allow_html=True)
 
@@ -169,15 +204,38 @@ def home():
             else:
                 filtered_opts = filter_for_machine(opts, selected_machine_code) if selected_machine_code else opts
                 if filtered_opts:
+                    is_fittings = f.lower() == "fittings"
                     st.markdown(f"<p class='config-label'>{f}</p>", unsafe_allow_html=True)
+                    fmt = format_fitting_option if is_fittings else lambda x: f"{x['code']} - {x['name']}"
                     o = st.selectbox(
                         f,
                         filtered_opts,
-                        format_func=lambda x: f"{x['code']} - {x['name']}",
+                        format_func=fmt,
                         help=f"Select {f}",
                         label_visibility="collapsed"
                     )
                     sel[f] = {"code": o["code"], "name": o["name"], "tally_name": o.get("tally_name", ""), "description": o.get("description", "")}
+
+                    if is_fittings and o.get("name", "").lower() != "none":
+                        inlet, outlet = parse_fitting_parts(o["name"])
+                        parts_html = ""
+                        if inlet:
+                            parts_html += (
+                                '<div class="fitting-part">'
+                                '<div class="fitting-part-label">Inlet</div>'
+                                f'<div class="fitting-part-value">{inlet}</div>'
+                                '</div>'
+                                '<div class="fitting-divider"></div>'
+                            )
+                        if outlet:
+                            parts_html += (
+                                '<div class="fitting-part">'
+                                '<div class="fitting-part-label">Outlet</div>'
+                                f'<div class="fitting-part-value">{outlet}</div>'
+                                '</div>'
+                            )
+                        if parts_html:
+                            st.markdown(f'<div class="fitting-breakdown">{parts_html}</div>', unsafe_allow_html=True)
 
         st.markdown("<div style='margin-top: 20px;'></div>", unsafe_allow_html=True)
         st.markdown("<p class='subheading'>Extras</p>", unsafe_allow_html=True)

@@ -180,6 +180,28 @@ def get_option_label(o):
     return f"{o['code']} : {o['name']}"
 
 
+def format_fitting_option(opt):
+    """Format a fitting option to visually separate inlet and outlet."""
+    name = opt.get("name", "")
+    code = opt.get("code", "")
+    if " + " in name:
+        inlet, outlet = name.split(" + ", 1)
+        return f"{code}  —  Inlet: {inlet}  |  Outlet: {outlet}"
+    if name.lower() == "none":
+        return f"{code} - None"
+    return f"{code}  —  Outlet: {name}"
+
+
+def parse_fitting_parts(name):
+    """Split a fitting option name into (inlet, outlet) strings."""
+    if " + " in name:
+        inlet, outlet = name.split(" + ", 1)
+        return inlet.strip(), outlet.strip()
+    if name.lower() == "none":
+        return None, None
+    return None, name.strip()
+
+
 def normalize_fields(cat):
     """
     Normalize category fields structure to ensure consistent format.
