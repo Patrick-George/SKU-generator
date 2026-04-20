@@ -525,16 +525,39 @@ def _strip_sep(s, sep):
     return s
 
 
-def _split_base_and_extras(sku_code, sep):
+def _split_base_and_extras(sku_code, sep, extras):
     """
     Split an SKU into (base, extras_str) around the 'X' marker.
     The encoder inserts sep+'X' between the base and concatenated extras when both exist.
+
+    Only splits if the category has extras configured AND the tail after the marker
+    actually parses as a sequence of extras codes. Otherwise the whole SKU is the base,
+    which avoids collisions with fields whose options include 'X' as a code.
     """
+    extras_pool = _valid_options(extras)
+    if not extras_pool:
+        return sku_code, ""
+
     marker = (sep + "X") if sep else "X"
     idx = sku_code.rfind(marker)
     if idx == -1:
         return sku_code, ""
-    return sku_code[:idx], sku_code[idx + len(marker):]
+
+    tail = sku_code[idx + len(marker):]
+    if not tail:
+        return sku_code, ""
+
+    # Verify the tail is fully consumable as a chain of extras codes; if not,
+    # the 'X' is probably part of a field code, not an extras marker.
+    t = tail
+    while t:
+        opt, code_len = _match_longest_prefix(t, extras_pool)
+        if opt is None:
+            return sku_code, ""
+        t = t[code_len:]
+        t = _strip_sep(t, sep)
+
+    return sku_code[:idx], tail
 
 
 def _valid_options(opts):
@@ -566,7 +589,13 @@ def _decode_for_category(sku_code, cat_name, cat_data):
     """
     Attempt to decode `sku_code` against a single category.
     Returns a dict with category, parts, extras, remaining, score — or None on no match.
-    Score = (fields_matched, -len(leftover)); higher is better.
+    Score = (machine_matched, concrete_parts_matched, -len(leftover)); higher is better.
+
+    Hard rules:
+    - If the category's machine-selector field has non-text options, at least one of
+      those options must be a prefix of the SKU. Otherwise the category is rejected.
+    - A text field only consumes characters when a following field's code is found
+      downstream in the remaining string. Otherwise it contributes nothing.
     """
     normalize_fields(cat_data)
     fields = cat_data.get("fields", {})
@@ -574,10 +603,19 @@ def _decode_for_category(sku_code, cat_name, cat_data):
     sep = cat_data.get("settings", {}).get("separator", DEFAULT_SEPARATOR)
     mf_name = get_machine_field(cat_data)
 
-    base, extras_str = _split_base_and_extras(sku_code, sep)
+    # Hard-require the machine field if it has concrete options.
+    mf_opts = _valid_options(fields.get(mf_name, {}).get("options", [])) if mf_name in fields else []
+    if mf_opts:
+        mf_hit, _ = _match_longest_prefix(sku_code, mf_opts)
+        if mf_hit is None:
+            return None
+
+    base, extras_str = _split_base_and_extras(sku_code, sep, extras)
 
     remaining = base
     matched_parts = []
+    concrete_matches = 0
+    machine_matched = False
     selected_machine_code = None
     field_order = ordered_fields(fields)
 
@@ -598,7 +636,9 @@ def _decode_for_category(sku_code, cat_name, cat_data):
         is_text_field = bool(raw_opts) and raw_opts[0].get("type") == "text"
 
         if is_text_field:
-            # Read text until we can match the next visible field's option (or hit end).
+            # Read text until we can match the next visible field's option.
+            # If no downstream field can match anywhere in `remaining`, the text
+            # field contributes nothing — it does NOT swallow the whole SKU.
             next_opts = []
             for j in range(i + 1, len(field_order)):
                 nxt = field_order[j]
@@ -611,10 +651,7 @@ def _decode_for_category(sku_code, cat_name, cat_data):
                     next_opts = no
                     break
 
-            consumed = remaining
-            tail = ""
-            if next_opts:
-                # Find earliest index where any next-field code begins.
+            if next_opts and remaining:
                 best_idx = -1
                 for k in range(len(remaining) + 1):
                     slice_ = remaining[k:]
@@ -624,17 +661,13 @@ def _decode_for_category(sku_code, cat_name, cat_data):
                     if matched_opt is not None:
                         best_idx = k
                         break
-                if best_idx >= 0:
-                    consumed = remaining[:best_idx]
-                    tail = remaining[best_idx:]
-
-            if consumed:
-                matched_parts.append({
-                    "field": fname,
-                    "code": consumed,
-                    "name": consumed,
-                })
-            remaining = _strip_sep(tail if next_opts else "", sep)
+                if best_idx > 0:
+                    matched_parts.append({
+                        "field": fname,
+                        "code": remaining[:best_idx],
+                        "name": remaining[:best_idx],
+                    })
+                    remaining = _strip_sep(remaining[best_idx:], sep)
             i += 1
             continue
 
@@ -656,11 +689,13 @@ def _decode_for_category(sku_code, cat_name, cat_data):
             "code": opt["code"],
             "name": opt.get("name", ""),
         })
+        concrete_matches += 1
         remaining = remaining[code_len:]
         remaining = _strip_sep(remaining, sep)
 
         if fname == mf_name:
             selected_machine_code = opt["code"]
+            machine_matched = True
 
         i += 1
 
@@ -690,10 +725,12 @@ def _decode_for_category(sku_code, cat_name, cat_data):
     if sep:
         leftover = leftover.strip(sep)
 
-    if not matched_parts:
+    # A category needs either a machine match or at least 2 concrete field matches
+    # to be a credible candidate. This kills spurious single-letter collisions.
+    if not machine_matched and concrete_matches < 2:
         return None
 
-    score = (len(matched_parts), -len(leftover))
+    score = (1 if machine_matched else 0, concrete_matches, -len(leftover))
 
     return {
         "category": cat_name,

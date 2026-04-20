@@ -14,12 +14,16 @@ st.set_page_config(
 # ==================================================
 # INIT
 # ==================================================
-if "sku_data" not in st.session_state:
-    gh = GithubStorage()
-    st.session_state["sku_data"] = gh.load() or {"inventory": {}}
-
 if "page" not in st.session_state:
     st.session_state["page"] = "home"
+
+# Reload the inventory from disk on every rerun so the app always reflects the
+# latest admin edits from any device. Skip reload while on the admin page so
+# unsaved edits in session_state aren't clobbered before the admin hits Save.
+if st.session_state["page"] != "admin":
+    st.session_state["sku_data"] = GithubStorage().load() or {"inventory": {}}
+elif "sku_data" not in st.session_state:
+    st.session_state["sku_data"] = GithubStorage().load() or {"inventory": {}}
 
 if "extras_page" not in st.session_state:
     st.session_state["extras_page"] = 0

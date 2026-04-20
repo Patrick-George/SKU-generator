@@ -651,6 +651,14 @@ def admin():
                 if opts and opts[0].get("type") == "text":
                     st.info("This is a text input field - users will enter values manually.")
                 else:
+                    x_codes = [o for o in opts if str(o.get("code", "")).upper() == "X"]
+                    if x_codes:
+                        st.warning(
+                            "⚠️ An option in this field uses the code `X`, which the encoder reserves as the separator "
+                            "between the base SKU and extras. The decoder now handles this correctly, but using a "
+                            "different code (e.g. `NA`, `NF`) is recommended to avoid ambiguity."
+                        )
+
                     df2 = normalize_option_df(opts)
                     edited_df = st.data_editor(
                         df2,
@@ -1135,33 +1143,37 @@ def decoder_page():
         results = decode_sku(decode_input, inv)
 
         if results:
-            for result in results:
-                st.success(f"✅ **Category Matched:** {result['category']}")
+            best = results[0]
+            st.success(f"✅ **Category Matched:** {best['category']}")
 
-                st.markdown("#### Component Breakdown:")
+            st.markdown("#### Component Breakdown:")
+            for part in best['parts']:
+                col1, col2, col3 = st.columns([1, 1, 2])
+                with col1:
+                    st.markdown(f"**{part['field']}**")
+                with col2:
+                    st.code(part['code'])
+                with col3:
+                    st.markdown(part['name'])
 
-                for part in result['parts']:
+            if best.get('extras'):
+                st.markdown("#### Extras:")
+                for extra in best['extras']:
                     col1, col2, col3 = st.columns([1, 1, 2])
                     with col1:
-                        st.markdown(f"**{part['field']}**")
+                        st.markdown("**Extra**")
                     with col2:
-                        st.code(part['code'])
+                        st.code(extra['code'])
                     with col3:
-                        st.markdown(part['name'])
+                        st.markdown(extra['name'])
 
-                if result.get('extras'):
-                    st.markdown("#### Extras:")
-                    for extra in result['extras']:
-                        col1, col2, col3 = st.columns([1, 1, 2])
-                        with col1:
-                            st.markdown("**Extra**")
-                        with col2:
-                            st.code(extra['code'])
-                        with col3:
-                            st.markdown(extra['name'])
+            if best.get('remaining'):
+                st.warning(f"⚠️ Unmatched portion: `{best['remaining']}`")
 
-                if result.get('remaining'):
-                    st.warning(f"⚠️ Unmatched portion: `{result['remaining']}`")
+            if len(results) > 1:
+                with st.expander(f"Other possible matches ({len(results) - 1})", expanded=False):
+                    for other in results[1:]:
+                        st.markdown(f"**{other['category']}** — {len(other['parts'])} fields matched, leftover `{other.get('remaining') or '—'}`")
         else:
             st.error("❌ Could not decode this SKU. It may not match any configured category.")
             st.info("💡 Make sure the SKU follows the correct format for one of your product categories.")
@@ -1399,26 +1411,29 @@ def scanner_page():
         results = decode_sku(scanned_sku, inv)
 
         if results:
-            for result in results:
-                st.success(f"✅ **{result['category']}**")
+            best = results[0]
+            st.success(f"✅ **{best['category']}**")
 
-                for part in result['parts']:
-                    col1, col2, col3 = st.columns([1, 1, 2])
-                    with col1:
-                        st.markdown(f"**{part['field']}**")
-                    with col2:
-                        st.code(part['code'])
-                    with col3:
-                        st.markdown(part['name'])
+            for part in best['parts']:
+                col1, col2, col3 = st.columns([1, 1, 2])
+                with col1:
+                    st.markdown(f"**{part['field']}**")
+                with col2:
+                    st.code(part['code'])
+                with col3:
+                    st.markdown(part['name'])
 
-                for extra in result.get('extras', []):
-                    col1, col2, col3 = st.columns([1, 1, 2])
-                    with col1:
-                        st.markdown("**Extra**")
-                    with col2:
-                        st.code(extra['code'])
-                    with col3:
-                        st.markdown(extra['name'])
+            for extra in best.get('extras', []):
+                col1, col2, col3 = st.columns([1, 1, 2])
+                with col1:
+                    st.markdown("**Extra**")
+                with col2:
+                    st.code(extra['code'])
+                with col3:
+                    st.markdown(extra['name'])
+
+            if best.get('remaining'):
+                st.warning(f"⚠️ Unmatched portion: `{best['remaining']}`")
         else:
             st.error("❌ Could not decode SKU")
 
