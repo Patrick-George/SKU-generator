@@ -518,65 +518,211 @@ def add_to_sku_history(sku, description, category):
     st.session_state["sku_history"] = history
 
 
-def decode_sku(sku_code, inventory):
-    """Decode a SKU code and return breakdown."""
-    results = []
+def _strip_sep(s, sep):
+    """Strip a single leading separator if present (no-op when sep is empty)."""
+    if sep and s.startswith(sep):
+        return s[len(sep):]
+    return s
 
-    for cat_name, cat_data in inventory.items():
-        normalize_fields(cat_data)
-        fields = cat_data.get("fields", {})
-        extras = cat_data.get("extras", [])
-        sep = cat_data.get("settings", {}).get("separator", DEFAULT_SEPARATOR)
 
-        remaining = sku_code
-        matched_parts = []
-        matched = True
+def _split_base_and_extras(sku_code, sep):
+    """
+    Split an SKU into (base, extras_str) around the 'X' marker.
+    The encoder inserts sep+'X' between the base and concatenated extras when both exist.
+    """
+    marker = (sep + "X") if sep else "X"
+    idx = sku_code.rfind(marker)
+    if idx == -1:
+        return sku_code, ""
+    return sku_code[:idx], sku_code[idx + len(marker):]
 
-        for field_name in ordered_fields(fields):
-            opts = fields[field_name].get("options", [])
-            field_matched = False
 
-            for opt in opts:
-                if opt.get("type") == "text":
+def _valid_options(opts):
+    """Filter out null/empty and text-type options, leaving only concrete matchable codes."""
+    out = []
+    for o in opts or []:
+        if o.get("type") == "text":
+            continue
+        code = o.get("code")
+        if not code:
+            continue
+        out.append(o)
+    return out
+
+
+def _match_longest_prefix(remaining, opts):
+    """Return (opt, code_len) for the longest-code option that is a prefix of `remaining`, else (None, 0)."""
+    best = None
+    best_len = 0
+    for opt in opts:
+        code = opt.get("code", "")
+        if code and remaining.startswith(code) and len(code) > best_len:
+            best = opt
+            best_len = len(code)
+    return best, best_len
+
+
+def _decode_for_category(sku_code, cat_name, cat_data):
+    """
+    Attempt to decode `sku_code` against a single category.
+    Returns a dict with category, parts, extras, remaining, score — or None on no match.
+    Score = (fields_matched, -len(leftover)); higher is better.
+    """
+    normalize_fields(cat_data)
+    fields = cat_data.get("fields", {})
+    extras = cat_data.get("extras", [])
+    sep = cat_data.get("settings", {}).get("separator", DEFAULT_SEPARATOR)
+    mf_name = get_machine_field(cat_data)
+
+    base, extras_str = _split_base_and_extras(sku_code, sep)
+
+    remaining = base
+    matched_parts = []
+    selected_machine_code = None
+    field_order = ordered_fields(fields)
+
+    def field_visible(fname):
+        field_machines = fields[fname].get("machines", [])
+        if not field_machines or not selected_machine_code:
+            return True
+        return selected_machine_code in field_machines
+
+    i = 0
+    while i < len(field_order):
+        fname = field_order[i]
+        if not field_visible(fname):
+            i += 1
+            continue
+
+        raw_opts = fields[fname].get("options", [])
+        is_text_field = bool(raw_opts) and raw_opts[0].get("type") == "text"
+
+        if is_text_field:
+            # Read text until we can match the next visible field's option (or hit end).
+            next_opts = []
+            for j in range(i + 1, len(field_order)):
+                nxt = field_order[j]
+                if not field_visible(nxt):
                     continue
-                code = opt.get("code", "")
-                if code and remaining.startswith(code):
-                    matched_parts.append({
-                        "field": field_name,
-                        "code": code,
-                        "name": opt.get("name", "")
-                    })
-                    remaining = remaining[len(code):]
-                    if remaining.startswith(sep):
-                        remaining = remaining[len(sep):]
-                    field_matched = True
+                no = _valid_options(fields[nxt].get("options", []))
+                if selected_machine_code:
+                    no = filter_for_machine(no, selected_machine_code)
+                if no:
+                    next_opts = no
                     break
 
-            if not field_matched and opts and not (opts[0].get("type") == "text"):
-                matched = False
-                break
+            consumed = remaining
+            tail = ""
+            if next_opts:
+                # Find earliest index where any next-field code begins.
+                best_idx = -1
+                for k in range(len(remaining) + 1):
+                    slice_ = remaining[k:]
+                    if not slice_:
+                        continue
+                    matched_opt, _ = _match_longest_prefix(slice_, next_opts)
+                    if matched_opt is not None:
+                        best_idx = k
+                        break
+                if best_idx >= 0:
+                    consumed = remaining[:best_idx]
+                    tail = remaining[best_idx:]
 
-        if remaining.startswith("X"):
-            remaining = remaining[1:]
-        elif remaining.startswith(sep + "X"):
-            remaining = remaining[len(sep) + 1:]
-        matched_extras = []
-        for extra in extras:
-            code = extra.get("code", "")
-            if code and code in remaining:
-                matched_extras.append({
-                    "field": "Extra",
-                    "code": code,
-                    "name": extra.get("name", "")
+            if consumed:
+                matched_parts.append({
+                    "field": fname,
+                    "code": consumed,
+                    "name": consumed,
                 })
-                remaining = remaining.replace(code, "", 1)
+            remaining = _strip_sep(tail if next_opts else "", sep)
+            i += 1
+            continue
 
-        if matched and matched_parts:
-            results.append({
-                "category": cat_name,
-                "parts": matched_parts,
-                "extras": matched_extras,
-                "remaining": remaining.strip(sep)
-            })
+        opts = _valid_options(raw_opts)
+        if selected_machine_code:
+            opts = filter_for_machine(opts, selected_machine_code)
 
-    return results
+        if not opts:
+            i += 1
+            continue
+
+        opt, code_len = _match_longest_prefix(remaining, opts)
+        if opt is None:
+            i += 1
+            continue
+
+        matched_parts.append({
+            "field": fname,
+            "code": opt["code"],
+            "name": opt.get("name", ""),
+        })
+        remaining = remaining[code_len:]
+        remaining = _strip_sep(remaining, sep)
+
+        if fname == mf_name:
+            selected_machine_code = opt["code"]
+
+        i += 1
+
+    # Decode extras by repeatedly consuming the longest matching extra code.
+    matched_extras = []
+    extras_pool = _valid_options(extras)
+    if selected_machine_code:
+        extras_pool = filter_for_machine(extras_pool, selected_machine_code)
+    extras_remaining = extras_str
+    while extras_remaining:
+        opt, code_len = _match_longest_prefix(extras_remaining, extras_pool)
+        if opt is None:
+            break
+        matched_extras.append({
+            "field": "Extra",
+            "code": opt["code"],
+            "name": opt.get("name", ""),
+        })
+        extras_remaining = extras_remaining[code_len:]
+        extras_remaining = _strip_sep(extras_remaining, sep)
+
+    leftover = remaining
+    if extras_remaining:
+        if leftover and sep:
+            leftover += sep
+        leftover += extras_remaining
+    if sep:
+        leftover = leftover.strip(sep)
+
+    if not matched_parts:
+        return None
+
+    score = (len(matched_parts), -len(leftover))
+
+    return {
+        "category": cat_name,
+        "parts": matched_parts,
+        "extras": matched_extras,
+        "remaining": leftover,
+        "score": score,
+    }
+
+
+def decode_sku(sku_code, inventory):
+    """
+    Decode a SKU code and return a ranked list of category matches.
+
+    Uses longest-prefix matching per field, respects machine-based visibility,
+    handles text fields, and splits base/extras on the 'X' marker.
+    """
+    if not sku_code:
+        return []
+
+    candidates = []
+    for cat_name, cat_data in inventory.items():
+        result = _decode_for_category(sku_code, cat_name, cat_data)
+        if result is not None:
+            candidates.append(result)
+
+    candidates.sort(key=lambda r: r["score"], reverse=True)
+
+    for r in candidates:
+        r.pop("score", None)
+
+    return candidates
