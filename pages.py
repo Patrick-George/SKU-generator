@@ -1099,14 +1099,18 @@ def decoder_page():
 
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
-        decode_input = st.text_input(
-            "Enter SKU Code",
-            placeholder="e.g., BL20MSF0",
-            key="decoder_main_input",
-            label_visibility="collapsed"
-        )
+        with st.form("decoder_form", clear_on_submit=False):
+            decode_input = st.text_input(
+                "Enter SKU Code",
+                placeholder="e.g., BL20MSF0",
+                key="decoder_main_input",
+                label_visibility="collapsed"
+            )
+            submitted = st.form_submit_button(
+                "🔍 Decode", use_container_width=True, type="primary"
+            )
 
-        st.markdown("<p style='text-align: center; font-size: 12px; color: #888;'>Type or paste any SKU code above</p>", unsafe_allow_html=True)
+        st.markdown("<p style='text-align: center; font-size: 12px; color: #888;'>Type or paste any SKU code, then press Enter or click Decode</p>", unsafe_allow_html=True)
 
     if decode_input:
         st.markdown("---")
