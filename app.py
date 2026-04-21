@@ -1,3 +1,5 @@
+import os
+
 import streamlit as st
 from storage import GithubStorage
 from pages import home, login, admin, history_page, decoder_page, category_items_page
@@ -10,6 +12,10 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="collapsed"
 )
+
+_logo_path = os.path.join(os.path.dirname(__file__), "assets", "blastline_logo.png")
+if os.path.exists(_logo_path):
+    st.logo(_logo_path, size="large")
 
 # ==================================================
 # INIT

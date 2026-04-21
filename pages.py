@@ -2,20 +2,8 @@ import streamlit as st
 import pandas as pd
 import json
 import os
-import base64
 
 from storage import GithubStorage
-
-
-@st.cache_data(show_spinner=False)
-def _get_logo_base64():
-    """Load the Blastline logo as a base64 data URI (cached)."""
-    logo_path = os.path.join(os.path.dirname(__file__), "assets", "blastline_logo.png")
-    try:
-        with open(logo_path, "rb") as f:
-            return "data:image/png;base64," + base64.b64encode(f.read()).decode()
-    except FileNotFoundError:
-        return ""
 from helpers import (
     DEFAULT_SEPARATOR,
     DEFAULT_EXTRAS_MODE,
@@ -77,18 +65,6 @@ def home():
             font-size: 26px;
             color: #1a1a1a;
             letter-spacing: -0.5px;
-        }
-        .page-title-row {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 14px;
-            margin-bottom: 0;
-        }
-        .page-title-row img {
-            height: 40px;
-            width: auto;
-            display: block;
         }
         .page-subtitle {
             text-align: center;
@@ -159,12 +135,7 @@ def home():
         </style>
     """, unsafe_allow_html=True)
 
-    logo_src = _get_logo_base64()
-    logo_img = f"<img src='{logo_src}' alt='Blastline'>" if logo_src else ""
-    st.markdown(
-        f"<div class='page-title-row'>{logo_img}<h2 class='page-title'>Blastline SKU Configurator</h2></div>",
-        unsafe_allow_html=True,
-    )
+    st.markdown("<h2 class='page-title'>Blastline SKU Configurator</h2>", unsafe_allow_html=True)
     st.markdown("<p class='page-subtitle'>Configure product specifications and generate SKU codes</p>", unsafe_allow_html=True)
 
     inv = st.session_state["sku_data"]["inventory"]
