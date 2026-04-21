@@ -19,26 +19,32 @@ class GithubStorage:
         Load configuration data from disk.
         If no data file exists yet, seed from bundled data.json (if present).
         """
+        data = None
         if os.path.exists(self.path):
             try:
                 with open(self.path, "r", encoding="utf-8") as f:
-                    return json.load(f)
-            except Exception:
-                return {"inventory": {}}
-
-        seed_path = os.path.join(os.path.dirname(__file__), "data.json")
-        if os.path.exists(seed_path):
-            try:
-                with open(seed_path, "r", encoding="utf-8") as f:
                     data = json.load(f)
-                os.makedirs(os.path.dirname(self.path), exist_ok=True)
-                with open(self.path, "w", encoding="utf-8") as out_f:
-                    json.dump(data, out_f, indent=2)
-                return data
             except Exception:
-                return {"inventory": {}}
+                data = None
 
-        return {"inventory": {}}
+        if data is None:
+            seed_path = os.path.join(os.path.dirname(__file__), "data.json")
+            if os.path.exists(seed_path):
+                try:
+                    with open(seed_path, "r", encoding="utf-8") as f:
+                        data = json.load(f)
+                    os.makedirs(os.path.dirname(self.path), exist_ok=True)
+                    with open(self.path, "w", encoding="utf-8") as out_f:
+                        json.dump(data, out_f, indent=2)
+                except Exception:
+                    data = None
+
+        if data is None:
+            data = {"inventory": {}}
+
+        data.setdefault("inventory", {})
+        data.setdefault("sku_history", [])
+        return data
 
     def save(self, data):
         """Save configuration data to disk."""
@@ -47,5 +53,17 @@ class GithubStorage:
             with open(self.path, "w", encoding="utf-8") as f:
                 json.dump(data, f, indent=2)
             return True
+        except Exception:
+            return False
+
+    def save_history(self, history):
+        """
+        Persist just the sku_history list without touching inventory.
+        Read-modify-write so concurrent admin edits aren't clobbered.
+        """
+        try:
+            current = self.load()
+            current["sku_history"] = history
+            return self.save(current)
         except Exception:
             return False

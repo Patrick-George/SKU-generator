@@ -1,11 +1,8 @@
 import streamlit as st
 import pandas as pd
 import itertools
-import base64
-import qrcode
 import os
 import anthropic
-from io import BytesIO
 
 # ==================================================
 # CONSTANTS
@@ -359,64 +356,6 @@ def big_copy_box(text):
     """
 
 
-def generate_qr_code(text, size=200):
-    """Generate a QR code image for the given text."""
-    qr = qrcode.QRCode(
-        version=1,
-        error_correction=qrcode.constants.ERROR_CORRECT_L,
-        box_size=10,
-        border=4,
-    )
-    qr.add_data(text)
-    qr.make(fit=True)
-
-    img = qr.make_image(fill_color="black", back_color="white")
-
-    buffer = BytesIO()
-    img.save(buffer, format="PNG")
-    buffer.seek(0)
-
-    return buffer
-
-
-def get_qr_code_base64(text):
-    """Generate a QR code and return as base64 string for HTML embedding."""
-    buffer = generate_qr_code(text)
-    return base64.b64encode(buffer.getvalue()).decode()
-
-
-def generate_qr_svg(text):
-    """Generate a QR code as SVG string."""
-    qr = qrcode.QRCode(
-        version=1,
-        error_correction=qrcode.constants.ERROR_CORRECT_L,
-        box_size=10,
-        border=4,
-    )
-    qr.add_data(text)
-    qr.make(fit=True)
-
-    matrix = qr.get_matrix()
-    size = len(matrix)
-    scale = 10
-
-    svg_size = size * scale
-    svg_parts = [
-        f'<svg xmlns="http://www.w3.org/2000/svg" width="{svg_size}" height="{svg_size}" viewBox="0 0 {svg_size} {svg_size}">',
-        f'<rect width="100%" height="100%" fill="white"/>',
-    ]
-
-    for y, row in enumerate(matrix):
-        for x, cell in enumerate(row):
-            if cell:
-                svg_parts.append(
-                    f'<rect x="{x * scale}" y="{y * scale}" width="{scale}" height="{scale}" fill="black"/>'
-                )
-
-    svg_parts.append('</svg>')
-    return '\n'.join(svg_parts)
-
-
 def show_success(message):
     """Display success message."""
     st.success(message)
@@ -479,7 +418,6 @@ def render_sidebar_nav(current_page="home"):
         ("home", "SKU Generator"),
         ("history", "SKU History"),
         ("decoder", "SKU Decoder"),
-        ("scanner", "QR Scanner"),
         ("category_items", "Category - Item Pairs"),
     ]
 
@@ -496,11 +434,15 @@ def render_sidebar_nav(current_page="home"):
 
 
 def add_to_sku_history(sku, description, category):
-    """Add a SKU to history (avoid duplicates, limit size)."""
+    """Add a SKU to history (avoid duplicates, limit size). Persists to disk."""
     if not sku:
         return
 
-    history = st.session_state.get("sku_history", [])
+    from storage import GithubStorage
+
+    storage = GithubStorage()
+    data = storage.load()
+    history = data.get("sku_history", [])
 
     entry = {
         "sku": sku,
@@ -515,7 +457,10 @@ def add_to_sku_history(sku, description, category):
     if len(history) > MAX_SKU_HISTORY:
         history = history[:MAX_SKU_HISTORY]
 
+    storage.save_history(history)
     st.session_state["sku_history"] = history
+    if "sku_data" in st.session_state:
+        st.session_state["sku_data"]["sku_history"] = history
 
 
 def _strip_sep(s, sep):

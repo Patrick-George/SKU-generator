@@ -1,7 +1,6 @@
 import streamlit as st
 import pandas as pd
 import json
-import base64
 import os
 
 from storage import GithubStorage
@@ -17,8 +16,6 @@ from helpers import (
     normalize_extras_df,
     generate_full_matrix,
     generate_mapped_name_and_description,
-    get_qr_code_base64,
-    generate_qr_code,
     add_to_sku_history,
     decode_sku,
     render_sidebar_nav,
@@ -307,10 +304,6 @@ def home():
                 escaped_name = mapped_name.replace("'", "\\'").replace("`", "") if mapped_name else ""
                 escaped_desc = mapped_desc.replace("'", "\\'").replace("`", "") if mapped_desc else ""
 
-                qr_base64 = get_qr_code_base64(sku)
-                qr_buffer = generate_qr_code(sku, size=300)
-                qr_download_base64 = base64.b64encode(qr_buffer.getvalue()).decode()
-
                 sq = "\x27"  # single quote for use inside f-string expressions
                 name_card_html = (
                     '<div class="copy-card name-card" onclick="copyText('
@@ -380,17 +373,6 @@ def home():
                         border-radius: 4px; font-size: 12px; font-weight: 600;
                         font-family: 'SF Mono', 'Fira Code', monospace; min-width: 28px; text-align: center;
                     }}
-                    .qr-row {{
-                        display: flex; align-items: center; gap: 16px; margin-top: 6px;
-                    }}
-                    .qr-row img {{ width: 64px; height: 64px; border-radius: 6px; }}
-                    .dl-btn {{
-                        display: inline-flex; align-items: center; gap: 5px;
-                        background: #f4f6f8; border: 1px solid #dde1e6; border-radius: 8px;
-                        padding: 8px 14px; text-decoration: none; color: #444;
-                        font-size: 12px; font-weight: 500; transition: background 0.15s;
-                    }}
-                    .dl-btn:hover {{ background: #e8ecf0; }}
                 </style>
 
                 <div style="display: flex; flex-direction: column; gap: 16px;">
@@ -421,18 +403,6 @@ def home():
                             {breakdown_html}
                         </div>
                     </div>
-
-                    <!-- QR Code -->
-                    <div>
-                        <div class="section-label">QR Code</div>
-                        <div class="qr-row">
-                            <img src="data:image/png;base64,{qr_base64}">
-                            <a class="dl-btn" href="data:image/png;base64,{qr_download_base64}" download="{sku}_QR.png">
-                                <span class="material-symbols-outlined" style="font-size: 16px;">download</span>
-                                Download PNG
-                            </a>
-                        </div>
-                    </div>
                 </div>
 
                 <script>
@@ -452,7 +422,7 @@ def home():
                 """
 
                 total_items = len(all_breakdown_items)
-                card_height = 370 + (total_items * 28)
+                card_height = 280 + (total_items * 28)
                 if cat == "Blast Machine":
                     card_height -= 80
                 if mapped_desc and len(mapped_desc) > 80:
@@ -1103,7 +1073,10 @@ def history_page():
         col1, col2, col3 = st.columns([1, 1, 2])
         with col1:
             if st.button("🗑️ Clear All History", type="secondary"):
+                GithubStorage().save_history([])
                 st.session_state["sku_history"] = []
+                if "sku_data" in st.session_state:
+                    st.session_state["sku_data"]["sku_history"] = []
                 st.rerun()
     else:
         st.info("📭 No SKU history yet. Generate some SKUs to see them here!")
@@ -1177,274 +1150,6 @@ def decoder_page():
         else:
             st.error("❌ Could not decode this SKU. It may not match any configured category.")
             st.info("💡 Make sure the SKU follows the correct format for one of your product categories.")
-
-
-# ==================================================
-# SCANNER PAGE
-# ==================================================
-def scanner_page():
-    """QR Scanner page with JavaScript-based scanning."""
-    with st.sidebar:
-        render_sidebar_nav("scanner")
-
-    st.markdown("<h2 style='text-align: center;'>📱 QR Code Scanner</h2>", unsafe_allow_html=True)
-    st.markdown("<p style='text-align: center; color: #666;'>Scan a QR code to decode the SKU instantly</p>", unsafe_allow_html=True)
-
-    st.markdown("---")
-
-    qr_scanner_html = """
-    <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
-    <style>
-        #qr-reader {
-            width: 100%;
-            max-width: 500px;
-            margin: 0 auto;
-        }
-        #qr-reader__scan_region {
-            border-radius: 12px;
-            overflow: hidden;
-        }
-        #result-container {
-            margin-top: 20px;
-            padding: 20px;
-            border-radius: 12px;
-            text-align: center;
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-        }
-        .success-result {
-            background: #d4edda;
-            border: 1px solid #c3e6cb;
-        }
-        .scanned-sku {
-            font-size: 24px;
-            font-weight: bold;
-            color: #155724;
-            margin: 10px 0;
-            font-family: monospace;
-        }
-        .copy-btn {
-            background: #28a745;
-            color: white;
-            border: none;
-            padding: 10px 20px;
-            border-radius: 6px;
-            cursor: pointer;
-            font-size: 14px;
-            margin: 5px;
-        }
-        .copy-btn:hover {
-            background: #218838;
-        }
-        .decode-btn {
-            background: #007bff;
-            color: white;
-            border: none;
-            padding: 10px 20px;
-            border-radius: 6px;
-            cursor: pointer;
-            font-size: 14px;
-            margin: 5px;
-        }
-        .decode-btn:hover {
-            background: #0056b3;
-        }
-        #start-btn {
-            padding: 16px 32px;
-            font-size: 18px;
-            border: none;
-            border-radius: 12px;
-            cursor: pointer;
-            background: #1a73e8;
-            color: white;
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-        }
-        #start-btn:hover {
-            background: #1557b0;
-        }
-        #stop-btn {
-            width: 60px;
-            height: 60px;
-            border-radius: 50%;
-            border: 4px solid #fff;
-            background: #dc3545;
-            cursor: pointer;
-            box-shadow: 0 4px 15px rgba(220, 53, 69, 0.4);
-            transition: all 0.2s;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-        #stop-btn:hover {
-            background: #c82333;
-            transform: scale(1.05);
-        }
-        #stop-btn:active {
-            transform: scale(0.95);
-        }
-        #stop-btn .stop-icon {
-            width: 20px;
-            height: 20px;
-            background: white;
-            border-radius: 3px;
-        }
-        .btn-container {
-            text-align: center;
-            margin: 15px 0;
-        }
-        .stop-container {
-            text-align: center;
-            margin: 20px 0;
-            display: none;
-        }
-        .stop-container.active {
-            display: block;
-        }
-    </style>
-
-    <div class="btn-container" id="start-container">
-        <button id="start-btn" onclick="startScanner()">📷 Start Camera</button>
-    </div>
-
-    <div id="qr-reader"></div>
-
-    <div class="stop-container" id="stop-container">
-        <button id="stop-btn" onclick="stopScanner()" title="Stop Camera">
-            <div class="stop-icon"></div>
-        </button>
-        <p style="margin-top: 8px; color: #666; font-size: 12px;">Tap to stop</p>
-    </div>
-
-    <div id="result-container"></div>
-
-    <script>
-        let html5QrCode = null;
-        let lastResult = '';
-
-        function startScanner() {
-            document.getElementById('start-container').style.display = 'none';
-            document.getElementById('stop-container').classList.add('active');
-            document.getElementById('result-container').innerHTML = '';
-
-            html5QrCode = new Html5Qrcode("qr-reader");
-
-            html5QrCode.start(
-                { facingMode: "environment" },
-                {
-                    fps: 10,
-                    qrbox: { width: 250, height: 250 }
-                },
-                (decodedText, decodedResult) => {
-                    if (decodedText !== lastResult) {
-                        lastResult = decodedText;
-                        onScanSuccess(decodedText);
-                    }
-                },
-                (errorMessage) => {
-                    // Ignore scan errors
-                }
-            ).catch((err) => {
-                document.getElementById('result-container').innerHTML =
-                    '<div style="color: #dc3545; padding: 20px;">❌ Camera access denied or not available.<br>Please allow camera access and try again.</div>';
-                document.getElementById('start-container').style.display = 'block';
-                document.getElementById('stop-container').classList.remove('active');
-            });
-        }
-
-        function stopScanner() {
-            if (html5QrCode) {
-                html5QrCode.stop().then(() => {
-                    document.getElementById('start-container').style.display = 'block';
-                    document.getElementById('stop-container').classList.remove('active');
-                });
-            }
-        }
-
-        function onScanSuccess(decodedText) {
-            try {
-                const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-                const oscillator = audioContext.createOscillator();
-                const gainNode = audioContext.createGain();
-                oscillator.connect(gainNode);
-                gainNode.connect(audioContext.destination);
-                oscillator.frequency.value = 800;
-                oscillator.type = 'sine';
-                gainNode.gain.value = 0.3;
-                oscillator.start();
-                setTimeout(() => oscillator.stop(), 150);
-            } catch(e) {}
-
-            document.getElementById('result-container').innerHTML = `
-                <div class="success-result">
-                    <div style="color: #155724; font-size: 16px;">✅ QR Code Scanned!</div>
-                    <div class="scanned-sku">${decodedText}</div>
-                    <button class="copy-btn" onclick="copyToClipboard('${decodedText}')">📋 Copy SKU</button>
-                    <button class="decode-btn" onclick="window.parent.postMessage({type:'qr_scanned', sku:'${decodedText}'}, '*')">🔍 Decode SKU</button>
-                </div>
-            `;
-        }
-
-        function copyToClipboard(text) {
-            navigator.clipboard.writeText(text).then(() => {
-                const btn = event.target;
-                btn.innerText = '✓ Copied!';
-                setTimeout(() => btn.innerText = '📋 Copy SKU', 2000);
-            });
-        }
-    </script>
-    """
-
-    st.components.v1.html(qr_scanner_html, height=550)
-
-    st.markdown("---")
-
-    st.markdown("### ✍️ Or Enter SKU Manually")
-
-    scanned_sku = st.text_input("Enter SKU code", placeholder="e.g., BL20MSF0", key="scanner_manual_input")
-
-    if scanned_sku:
-        st.markdown("---")
-        st.markdown(f"### Decoding: `{scanned_sku}`")
-
-        inv = st.session_state["sku_data"]["inventory"]
-        results = decode_sku(scanned_sku, inv)
-
-        if results:
-            best = results[0]
-            st.success(f"✅ **{best['category']}**")
-
-            for part in best['parts']:
-                col1, col2, col3 = st.columns([1, 1, 2])
-                with col1:
-                    st.markdown(f"**{part['field']}**")
-                with col2:
-                    st.code(part['code'])
-                with col3:
-                    st.markdown(part['name'])
-
-            for extra in best.get('extras', []):
-                col1, col2, col3 = st.columns([1, 1, 2])
-                with col1:
-                    st.markdown("**Extra**")
-                with col2:
-                    st.code(extra['code'])
-                with col3:
-                    st.markdown(extra['name'])
-
-            if best.get('remaining'):
-                st.warning(f"⚠️ Unmatched portion: `{best['remaining']}`")
-        else:
-            st.error("❌ Could not decode SKU")
-
-    st.markdown("---")
-    st.markdown("### 💡 Tips")
-    st.markdown("""
-    - Click **Start Camera** to activate the scanner
-    - Point your camera at any QR code
-    - The SKU will be detected automatically with a beep sound
-    - Click **Copy SKU** or **Decode SKU** to see the breakdown
-    """)
 
 
 # ==================================================

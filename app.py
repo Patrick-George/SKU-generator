@@ -1,6 +1,6 @@
 import streamlit as st
 from storage import GithubStorage
-from pages import home, login, admin, history_page, decoder_page, scanner_page, category_items_page
+from pages import home, login, admin, history_page, decoder_page, category_items_page
 
 # ==================================================
 # SETUP
@@ -34,8 +34,10 @@ if "confirm_delete_cat" not in st.session_state:
 if "confirm_delete_field" not in st.session_state:
     st.session_state["confirm_delete_field"] = None
 
-if "sku_history" not in st.session_state:
-    st.session_state["sku_history"] = []
+if st.session_state["page"] != "admin":
+    st.session_state["sku_history"] = list(st.session_state["sku_data"].get("sku_history", []))
+elif "sku_history" not in st.session_state:
+    st.session_state["sku_history"] = list(st.session_state["sku_data"].get("sku_history", []))
 
 if "admin_authenticated" not in st.session_state:
     st.session_state["admin_authenticated"] = False
@@ -53,7 +55,5 @@ elif st.session_state["page"] == "history":
     history_page()
 elif st.session_state["page"] == "decoder":
     decoder_page()
-elif st.session_state["page"] == "scanner":
-    scanner_page()
 elif st.session_state["page"] == "category_items":
     category_items_page()
