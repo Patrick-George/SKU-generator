@@ -17,6 +17,48 @@ _logo_path = os.path.join(os.path.dirname(__file__), "assets", "blastline_logo.p
 if os.path.exists(_logo_path):
     st.logo(_logo_path, size="large")
 
+# Replace the subtle ">>" sidebar expand control with a prominent hamburger-menu button
+st.markdown("""
+    <style>
+    [data-testid="stSidebarCollapsedControl"] {
+        top: 0.9rem !important;
+    }
+    [data-testid="stSidebarCollapsedControl"] button {
+        background: #1a5ed1 !important;
+        border: none !important;
+        border-radius: 10px !important;
+        width: 44px !important;
+        height: 40px !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        box-shadow: 0 2px 8px rgba(26, 94, 209, 0.35) !important;
+        transition: all 0.15s ease !important;
+        padding: 0 !important;
+    }
+    [data-testid="stSidebarCollapsedControl"] button:hover {
+        background: #1449a3 !important;
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(26, 94, 209, 0.45) !important;
+    }
+    [data-testid="stSidebarCollapsedControl"] button svg,
+    [data-testid="stSidebarCollapsedControl"] button [data-testid="stIconMaterial"],
+    [data-testid="stSidebarCollapsedControl"] button span {
+        display: none !important;
+    }
+    [data-testid="stSidebarCollapsedControl"] button::before {
+        content: "";
+        width: 20px;
+        height: 14px;
+        background-image: linear-gradient(#fff, #fff), linear-gradient(#fff, #fff), linear-gradient(#fff, #fff);
+        background-size: 100% 2.5px;
+        background-position: top left, center left, bottom left;
+        background-repeat: no-repeat;
+        border-radius: 2px;
+    }
+    </style>
+""", unsafe_allow_html=True)
+
 # ==================================================
 # INIT
 # ==================================================
