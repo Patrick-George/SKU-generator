@@ -422,10 +422,12 @@ def home():
                 """
 
                 total_items = len(all_breakdown_items)
-                card_height = 280 + (total_items * 28)
+                card_height = 320 + (total_items * 30)
                 if cat == "Blast Machine":
-                    card_height -= 80
+                    card_height -= 88
                 if mapped_desc and len(mapped_desc) > 80:
+                    card_height += 30
+                if mapped_name and len(mapped_name) > 80:
                     card_height += 30
                 st.components.v1.html(output_html, height=card_height)
 
