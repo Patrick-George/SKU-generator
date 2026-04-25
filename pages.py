@@ -25,6 +25,7 @@ from helpers import (
     show_info,
     format_fitting_option,
     parse_fitting_parts,
+    get_category_suffix,
 )
 
 
@@ -283,6 +284,9 @@ def home():
     base = sep.join([sel[k]["code"] for k in ordered_fields(fields) if sel.get(k) and sel[k]["code"]])
     extras_codes = "".join([c["code"] for c in chosen])
     sku = base + (sep + "X" if base and extras_codes else "") + extras_codes
+    cat_suffix = get_category_suffix(cat)
+    if sku and cat_suffix:
+        sku += cat_suffix
 
     breakdown_items = []
     fittings_selected = False
@@ -757,7 +761,7 @@ def admin():
 
                     if st.button("🔄 Generate Matrix"):
                         with st.spinner("Generating SKU matrix..."):
-                            matrix_df = generate_full_matrix(cat_data)
+                            matrix_df = generate_full_matrix(cat_data, cat)
                             st.session_state["matrix_preview"] = matrix_df
                             show_success(f"Generated {len(matrix_df):,} SKU combinations!")
                             st.rerun()

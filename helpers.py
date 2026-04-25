@@ -13,6 +13,18 @@ DEFAULT_EXTRAS_MODE = "Multiple"
 EXTRAS_PER_PAGE = 8
 MAX_SKU_HISTORY = 15
 
+# Per-category suffix appended to every generated SKU. Used to encode
+# manufacturer/source identity that doesn't vary across configurations
+# (e.g. all Blastline hoses are JollyFlex → "JF").
+CATEGORY_SUFFIXES = {
+    "Hose": "JF",
+}
+
+
+def get_category_suffix(category):
+    """Return the constant suffix for a category's SKU, or '' if none."""
+    return CATEGORY_SUFFIXES.get(category, "")
+
 # ==================================================
 # AI DESCRIPTION
 # ==================================================
@@ -268,11 +280,12 @@ def normalize_extras_df(data):
     return df[cols]
 
 
-def generate_full_matrix(cat_data):
+def generate_full_matrix(cat_data, category_name=None):
     """Generate all possible SKU combinations for a category."""
     normalize_fields(cat_data)
     fields = cat_data["fields"]
     sep = cat_data.get("settings", {}).get("separator", DEFAULT_SEPARATOR)
+    cat_suffix = get_category_suffix(category_name) if category_name else ""
 
     field_combos = []
     field_names = []
@@ -292,6 +305,8 @@ def generate_full_matrix(cat_data):
     rows = []
     for combo in combinations:
         sku = sep.join(combo)
+        if sku and cat_suffix:
+            sku += cat_suffix
         row = {"SKU": sku}
         for i, fname in enumerate(field_names):
             row[fname] = combo[i]
@@ -541,12 +556,27 @@ def _decode_for_category(sku_code, cat_name, cat_data):
       those options must be a prefix of the SKU. Otherwise the category is rejected.
     - A text field only consumes characters when a following field's code is found
       downstream in the remaining string. Otherwise it contributes nothing.
+    - If the category has a fixed SKU suffix (see CATEGORY_SUFFIXES), require the
+      SKU to end with it and strip it before parsing.
     """
     normalize_fields(cat_data)
     fields = cat_data.get("fields", {})
     extras = cat_data.get("extras", [])
     sep = cat_data.get("settings", {}).get("separator", DEFAULT_SEPARATOR)
     mf_name = get_machine_field(cat_data)
+
+    cat_suffix = get_category_suffix(cat_name)
+    suffix_part = None
+    if cat_suffix:
+        if not sku_code.endswith(cat_suffix):
+            return None
+        sku_code = sku_code[: -len(cat_suffix)]
+        sku_code = _strip_sep(sku_code[::-1], sep)[::-1] if sep else sku_code
+        suffix_part = {
+            "field": "Manufacturer",
+            "code": cat_suffix,
+            "name": "JollyFlex" if cat_suffix == "JF" else cat_suffix,
+        }
 
     # Hard-require the machine field if it has concrete options.
     mf_opts = _valid_options(fields.get(mf_name, {}).get("options", [])) if mf_name in fields else []
@@ -674,6 +704,10 @@ def _decode_for_category(sku_code, cat_name, cat_data):
     # to be a credible candidate. This kills spurious single-letter collisions.
     if not machine_matched and concrete_matches < 2:
         return None
+
+    if suffix_part is not None:
+        matched_parts.append(suffix_part)
+        concrete_matches += 1
 
     score = (1 if machine_matched else 0, concrete_matches, -len(leftover))
 
