@@ -580,13 +580,12 @@ def admin():
         if fields:
             with st.expander("🔀 Field Order", expanded=False):
                 df = pd.DataFrame([{"Field": k, "Order": v["order"]} for k, v in fields.items()])
-                edited = st.data_editor(df, hide_index=True, use_container_width=True)
-
-                if st.button("Apply Field Order"):
-                    for _, r in edited.iterrows():
+                edited = st.data_editor(df, hide_index=True, use_container_width=True, key="field_order_editor")
+                for _, r in edited.iterrows():
+                    try:
                         fields[r["Field"]]["order"] = int(r["Order"])
-                    show_success("Field order updated successfully!")
-                    st.rerun()
+                    except (ValueError, TypeError, KeyError):
+                        pass
 
             with st.expander("✏️ Rename / Delete Field", expanded=False):
                 field = st.selectbox("Select Field", ordered_fields(fields))
@@ -641,6 +640,7 @@ def admin():
                         num_rows="dynamic",
                         hide_index=True,
                         use_container_width=True,
+                        key=f"options_editor_{cat}_{field_for_options}",
                         column_config={
                             "code": st.column_config.TextColumn("Code", help="SKU code segment"),
                             "name": st.column_config.TextColumn("Name", help="Display name"),
@@ -649,10 +649,7 @@ def admin():
                             "order": st.column_config.NumberColumn("Order", help="Display order")
                         }
                     )
-                    if st.button("Update Options"):
-                        fields[field_for_options]["options"] = edited_df.to_dict("records")
-                        show_success(f"Options for '{field_for_options}' updated successfully!")
-                        st.rerun()
+                    fields[field_for_options]["options"] = edited_df.to_dict("records")
         else:
             st.info("No fields configured yet. Add a field above to get started.")
 
@@ -670,6 +667,7 @@ def admin():
                 num_rows="dynamic",
                 hide_index=True,
                 use_container_width=True,
+                key=f"extras_editor_{cat}",
                 column_config={
                     "code": st.column_config.TextColumn("Code", help="SKU code for this extra (will be appended to SKU)"),
                     "name": st.column_config.TextColumn("Name", help="Display name shown to users"),
@@ -678,11 +676,7 @@ def admin():
                     "order": st.column_config.NumberColumn("Order", help="Display order (lower numbers appear first)")
                 }
             )
-
-            if st.button("💾 Save Extras", type="primary"):
-                cat_data["extras"] = edited_extras.to_dict("records")
-                show_success(f"Extras updated successfully! Total: {len(edited_extras)}")
-                st.rerun()
+            cat_data["extras"] = edited_extras.to_dict("records")
 
         if len(extras) > 0:
             with st.expander("📋 Preview", expanded=False):
@@ -706,7 +700,7 @@ def admin():
                     value=settings.get("separator", DEFAULT_SEPARATOR),
                     help="Character used to separate SKU components",
                     max_chars=5,
-                    key="separator_input"
+                    key=f"separator_input_{cat}"
                 )
 
             with col2:
@@ -716,17 +710,12 @@ def admin():
                     options=["Single", "Multiple"],
                     index=0 if settings.get("extras_mode", DEFAULT_EXTRAS_MODE) == "Single" else 1,
                     help="Single: Users can select only one extra (radio buttons)\nMultiple: Users can select multiple extras (checkboxes)",
-                    key="extras_mode_input"
+                    key=f"extras_mode_input_{cat}"
                 )
 
-            st.markdown("---")
-
-            if st.button("💾 Save Settings", type="primary"):
-                settings["separator"] = separator
-                settings["extras_mode"] = extras_mode_setting
-                cat_data["settings"] = settings
-                show_success("Category settings saved successfully!")
-                st.rerun()
+            settings["separator"] = separator
+            settings["extras_mode"] = extras_mode_setting
+            cat_data["settings"] = settings
 
         with st.expander("📋 Current Settings Preview", expanded=False):
             st.write(f"**Separator:** `{settings.get('separator', DEFAULT_SEPARATOR)}`")
@@ -904,13 +893,10 @@ def admin():
                     "Which field acts as the Machine selector?",
                     field_names,
                     index=field_names.index(current_machine_field) if current_machine_field in field_names else 0,
-                    key="machine_field_select"
+                    key=f"machine_field_select_{cat}"
                 )
-                if st.button("Set Machine Field"):
-                    settings["machine_field"] = machine_field_name
-                    cat_data["settings"] = settings
-                    show_success(f"Machine selector field set to '{machine_field_name}'")
-                    st.rerun()
+                settings["machine_field"] = machine_field_name
+                cat_data["settings"] = settings
 
             mf_name = settings.get("machine_field", "Machine")
             if mf_name not in fields:
@@ -976,52 +962,47 @@ def admin():
                     else:
                         extras_checks = {}
 
-                    st.markdown("---")
-                    if st.button("💾 Save Machine Mapping", type="primary"):
-                        all_machine_codes = [o["code"] for o in machine_opts if o.get("code")]
+                    all_machine_codes = [o["code"] for o in machine_opts if o.get("code")]
 
-                        for f in other_fields:
-                            current_machines = fields[f].get("machines", [])
-                            new_machines = set(current_machines) if current_machines else set(all_machine_codes)
-                            if field_checks.get(f, True):
-                                new_machines.add(selected_machine_code)
-                            else:
-                                new_machines.discard(selected_machine_code)
-                            if new_machines >= set(all_machine_codes):
-                                fields[f].pop("machines", None)
-                            else:
-                                fields[f]["machines"] = sorted(new_machines)
+                    for f in other_fields:
+                        current_machines = fields[f].get("machines", [])
+                        new_machines = set(current_machines) if current_machines else set(all_machine_codes)
+                        if field_checks.get(f, True):
+                            new_machines.add(selected_machine_code)
+                        else:
+                            new_machines.discard(selected_machine_code)
+                        if new_machines >= set(all_machine_codes):
+                            fields[f].pop("machines", None)
+                        else:
+                            fields[f]["machines"] = sorted(new_machines)
 
-                        for f, opts_map in option_checks.items():
-                            opts = fields[f]["options"]
-                            for i, checked in opts_map.items():
-                                opt = opts[i]
-                                current_machines = opt.get("machines", [])
-                                new_machines = set(current_machines) if current_machines else set(all_machine_codes)
-                                if checked:
-                                    new_machines.add(selected_machine_code)
-                                else:
-                                    new_machines.discard(selected_machine_code)
-                                if new_machines >= set(all_machine_codes):
-                                    opt.pop("machines", None)
-                                else:
-                                    opt["machines"] = sorted(new_machines)
-
-                        for i, checked in extras_checks.items():
-                            e = extras[i]
-                            current_machines = e.get("machines", [])
+                    for f, opts_map in option_checks.items():
+                        opts = fields[f]["options"]
+                        for i, checked in opts_map.items():
+                            opt = opts[i]
+                            current_machines = opt.get("machines", [])
                             new_machines = set(current_machines) if current_machines else set(all_machine_codes)
                             if checked:
                                 new_machines.add(selected_machine_code)
                             else:
                                 new_machines.discard(selected_machine_code)
                             if new_machines >= set(all_machine_codes):
-                                e.pop("machines", None)
+                                opt.pop("machines", None)
                             else:
-                                e["machines"] = sorted(new_machines)
+                                opt["machines"] = sorted(new_machines)
 
-                        show_success(f"Machine mapping saved for '{selected_label}'!")
-                        st.rerun()
+                    for i, checked in extras_checks.items():
+                        e = extras[i]
+                        current_machines = e.get("machines", [])
+                        new_machines = set(current_machines) if current_machines else set(all_machine_codes)
+                        if checked:
+                            new_machines.add(selected_machine_code)
+                        else:
+                            new_machines.discard(selected_machine_code)
+                        if new_machines >= set(all_machine_codes):
+                            e.pop("machines", None)
+                        else:
+                            e["machines"] = sorted(new_machines)
 
     st.markdown("---")
 
