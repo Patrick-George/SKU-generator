@@ -670,6 +670,7 @@ def admin():
                         num_rows="dynamic",
                         hide_index=True,
                         use_container_width=True,
+                        height=min(38 + 35 * (len(df2) + 2), 800),
                         key=f"options_editor_{cat}_{field_for_options}",
                         column_config={
                             "code": st.column_config.TextColumn("Code", help="SKU code segment"),
@@ -697,6 +698,7 @@ def admin():
                 num_rows="dynamic",
                 hide_index=True,
                 use_container_width=True,
+                height=min(38 + 35 * (len(extras_df) + 2), 800),
                 key=f"extras_editor_{cat}",
                 column_config={
                     "code": st.column_config.TextColumn("Code", help="SKU code for this extra (will be appended to SKU)"),
