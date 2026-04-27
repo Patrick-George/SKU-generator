@@ -492,7 +492,9 @@ def admin():
     st.markdown(
         """
         <style>
-        /* Larger fonts on the admin page for readability */
+        /* Larger fonts on the admin page for readability.
+           Carefully avoids touching data-editor / dataframe internals,
+           since restyling those triggers layout reflow on every keystroke. */
         [data-testid="stCheckbox"] label p { font-size: 1.05rem !important; }
         [data-testid="stCheckbox"] label > div:first-child {
             transform: scale(1.15);
@@ -504,8 +506,14 @@ def admin():
         [data-testid="stCaptionContainer"], .stCaption, small { font-size: 0.95rem !important; }
         [data-testid="stWidgetLabel"] p,
         [data-testid="stWidgetLabel"] label { font-size: 1.05rem !important; }
-        [data-testid="stMarkdownContainer"] p { font-size: 1.02rem; }
         .stTabs [data-baseweb="tab"] p { font-size: 1.05rem !important; }
+
+        /* Neutralize the rules above inside data_editor / dataframe cells */
+        [data-testid="stDataFrame"] *,
+        [data-testid="stDataFrameResizable"] * {
+            font-size: revert !important;
+            transform: none !important;
+        }
         </style>
         """,
         unsafe_allow_html=True,
