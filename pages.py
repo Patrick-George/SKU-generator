@@ -488,35 +488,6 @@ def login():
 # ==================================================
 def admin():
     """Admin configuration page."""
-    st.markdown(
-        """
-        <style>
-        /* Larger fonts on the admin page for readability.
-           Carefully avoids touching data-editor / dataframe internals,
-           since restyling those triggers layout reflow on every keystroke. */
-        [data-testid="stCheckbox"] label p { font-size: 1.05rem !important; }
-        [data-testid="stCheckbox"] label > div:first-child {
-            transform: scale(1.15);
-            transform-origin: left center;
-            margin-right: 6px;
-        }
-        [data-testid="stRadio"] label p { font-size: 1.05rem !important; }
-        details summary p { font-size: 1.1rem !important; font-weight: 600; }
-        [data-testid="stCaptionContainer"], .stCaption, small { font-size: 0.95rem !important; }
-        [data-testid="stWidgetLabel"] p,
-        [data-testid="stWidgetLabel"] label { font-size: 1.05rem !important; }
-        .stTabs [data-baseweb="tab"] p { font-size: 1.05rem !important; }
-
-        /* Neutralize the rules above inside data_editor / dataframe cells */
-        [data-testid="stDataFrame"] *,
-        [data-testid="stDataFrameResizable"] * {
-            font-size: revert !important;
-            transform: none !important;
-        }
-        </style>
-        """,
-        unsafe_allow_html=True,
-    )
     st.title("⚙️ Admin Settings")
 
     col1, col2, col3 = st.columns([1, 3, 1])
