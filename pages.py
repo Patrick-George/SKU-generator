@@ -14,6 +14,7 @@ from helpers import (
     filter_for_machine,
     normalize_option_df,
     normalize_extras_df,
+    merge_editor_records,
     generate_full_matrix,
     generate_mapped_name_and_description,
     add_to_sku_history,
@@ -649,7 +650,7 @@ def admin():
                             "order": st.column_config.NumberColumn("Order", help="Display order")
                         }
                     )
-                    fields[field_for_options]["options"] = edited_df.to_dict("records")
+                    fields[field_for_options]["options"] = merge_editor_records(opts, edited_df.to_dict("records"))
         else:
             st.info("No fields configured yet. Add a field above to get started.")
 
@@ -676,7 +677,7 @@ def admin():
                     "order": st.column_config.NumberColumn("Order", help="Display order (lower numbers appear first)")
                 }
             )
-            cat_data["extras"] = edited_extras.to_dict("records")
+            cat_data["extras"] = merge_editor_records(extras, edited_extras.to_dict("records"))
 
         if len(extras) > 0:
             with st.expander("📋 Preview", expanded=False):

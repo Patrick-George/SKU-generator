@@ -248,6 +248,35 @@ def filter_for_machine(items, machine_code):
     ]
 
 
+def merge_editor_records(old_items, edited_records):
+    """
+    Merge edited records from a st.data_editor back into the original list,
+    preserving hidden keys (e.g. 'machines', 'type') that the editor strips.
+
+    Matches old→new rows by `code` with occurrence tracking, so duplicate codes
+    (e.g. two 'HP' rows in the same field) keep their independent mappings.
+    Rows whose code doesn't match any old row keep only what the editor returned
+    (correct for newly added rows; renames will lose their old mapping).
+    """
+    from collections import defaultdict
+
+    buckets = defaultdict(list)
+    for item in old_items:
+        buckets[item.get("code")].append(item)
+
+    merged = []
+    for rec in edited_records:
+        rec = dict(rec)
+        bucket = buckets.get(rec.get("code"))
+        if bucket:
+            prev = bucket.pop(0)
+            for k, v in prev.items():
+                if k not in rec:
+                    rec[k] = v
+        merged.append(rec)
+    return merged
+
+
 def normalize_option_df(data):
     """Convert options list to normalized DataFrame for editing."""
     cols = ["code", "name", "tally_name", "description", "order"]
