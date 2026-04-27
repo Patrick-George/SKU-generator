@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import itertools
 import os
+import re
 import anthropic
 
 # ==================================================
@@ -146,8 +147,32 @@ def generate_product_name_and_description(breakdown_items, category_name, sku, e
 # ==================================================
 # HELPERS
 # ==================================================
+def _parse_meters(name):
+    """Extract the leading meter value from a Roll Length name like '15mtr' or '1.5mtr'.
+    Returns float or None if not parseable (e.g. 'Custom')."""
+    m = re.match(r"\s*([\d.]+)\s*mtr", name or "", re.IGNORECASE)
+    return float(m.group(1)) if m else None
+
+
+def _apply_whip_paint_override(sel):
+    """Hose rule: Application=HP (Paint) with Roll Length strictly under 5m is a 'Whip Paint Hose'.
+    5m and Custom (unparseable) keep the default 'Paint Hose'."""
+    app = sel.get("Application")
+    roll = sel.get("Roll Length")
+    if not app or app.get("code") != "HP" or not roll:
+        return sel
+    meters = _parse_meters(roll.get("name", ""))
+    if meters is None or meters >= 5:
+        return sel
+    return {
+        **sel,
+        "Application": {**app, "tally_name": "Whip Paint Hose", "description": "Whip Paint Hose"},
+    }
+
+
 def generate_mapped_name_and_description(sel, ordered_field_names, chosen, fittings_selected):
     """Build item name and description deterministically from tally_name/description mappings."""
+    sel = _apply_whip_paint_override(sel)
     tally_parts = []
     desc_parts = []
     for k in ordered_field_names:
