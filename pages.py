@@ -14,6 +14,7 @@ from helpers import (
     filter_for_machine,
     normalize_option_df,
     normalize_extras_df,
+    merge_editor_records,
     generate_full_matrix,
     generate_mapped_name_and_description,
     add_to_sku_history,
@@ -634,9 +635,17 @@ def admin():
                             "different code (e.g. `NA`, `NF`) is recommended to avoid ambiguity."
                         )
 
-                    df2 = normalize_option_df(opts)
+                    # Snapshot the dataframe once per (cat, field) and reuse the
+                    # SAME object on every rerun. st.data_editor resets its pending
+                    # edits whenever the `data` arg's hash changes between reruns,
+                    # so rebuilding df2 from the just-saved opts each run silently
+                    # drops in-flight keystrokes. Holding a stable snapshot here is
+                    # what makes typed input persist on the first try.
+                    df_key = f"options_df_{cat}_{field_for_options}"
+                    if df_key not in st.session_state:
+                        st.session_state[df_key] = normalize_option_df(opts)
                     edited_df = st.data_editor(
-                        df2,
+                        st.session_state[df_key],
                         num_rows="dynamic",
                         hide_index=True,
                         use_container_width=True,
@@ -649,7 +658,7 @@ def admin():
                             "order": st.column_config.NumberColumn("Order", help="Display order")
                         }
                     )
-                    fields[field_for_options]["options"] = edited_df.to_dict("records")
+                    fields[field_for_options]["options"] = merge_editor_records(opts, edited_df.to_dict("records"))
         else:
             st.info("No fields configured yet. Add a field above to get started.")
 
@@ -661,9 +670,14 @@ def admin():
         with st.expander("🎁 Manage Extras / Add-ons", expanded=False):
             st.info(f"Extras will be displayed as a list (8 per page) in the configurator with pagination controls.")
 
-            extras_df = normalize_extras_df(extras)
+            # Snapshot once per category for the same reason as Field Options
+            # above — feeding a freshly-built DataFrame on every rerun makes
+            # st.data_editor drop pending keystrokes when its `data` hash flips.
+            extras_df_key = f"extras_df_{cat}"
+            if extras_df_key not in st.session_state:
+                st.session_state[extras_df_key] = normalize_extras_df(extras)
             edited_extras = st.data_editor(
-                extras_df,
+                st.session_state[extras_df_key],
                 num_rows="dynamic",
                 hide_index=True,
                 use_container_width=True,
@@ -676,7 +690,7 @@ def admin():
                     "order": st.column_config.NumberColumn("Order", help="Display order (lower numbers appear first)")
                 }
             )
-            cat_data["extras"] = edited_extras.to_dict("records")
+            cat_data["extras"] = merge_editor_records(extras, edited_extras.to_dict("records"))
 
         if len(extras) > 0:
             with st.expander("📋 Preview", expanded=False):
@@ -839,6 +853,9 @@ def admin():
                         if st.button("🚀 Import Database", type="primary", use_container_width=True):
                             if "Replace" in import_mode:
                                 st.session_state["sku_data"] = import_data
+                                # Drop cached editor dataframes so they re-init from the new inventory.
+                                for k in [k for k in st.session_state.keys() if k.startswith("options_df_") or k.startswith("extras_df_")]:
+                                    del st.session_state[k]
                                 if GithubStorage().save(st.session_state["sku_data"]):
                                     show_success(f"✅ Database replaced successfully! Imported {num_categories} categories.")
                                     st.rerun()
@@ -858,6 +875,11 @@ def admin():
                                         skipped += 1
 
                                 st.session_state["sku_data"]["inventory"] = existing_inv
+
+                                # Drop cached editor dataframes for any newly-added categories
+                                # so they pick up imported options/extras on the next render.
+                                for k in [k for k in st.session_state.keys() if k.startswith("options_df_") or k.startswith("extras_df_")]:
+                                    del st.session_state[k]
 
                                 if GithubStorage().save(st.session_state["sku_data"]):
                                     show_success(f"✅ Merge complete! Added {added} new categories, skipped {skipped} existing.")
