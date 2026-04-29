@@ -263,13 +263,21 @@ def get_machine_field(cat_data):
 def filter_for_machine(items, machine_code):
     """
     Return only items whose 'machines' tag includes machine_code.
-    Items with no 'machines' key or an empty list pass through (shown for all machines).
+
+    Convention:
+      - 'machines' key absent → legacy unmigrated item, visible for all machines.
+      - 'machines' key present (even if empty list) → visible only for the
+        machine codes explicitly listed. An empty list means visible for none.
+
+    This lets newly added fields/options/extras default to "no machines"
+    (explicit opt-in) while keeping existing data that predates the feature
+    visible everywhere until it is explicitly mapped.
     """
     if not machine_code:
         return items
     return [
         item for item in items
-        if not item.get("machines") or machine_code in item["machines"]
+        if "machines" not in item or machine_code in item["machines"]
     ]
 
 
@@ -298,6 +306,11 @@ def merge_editor_records(old_items, edited_records):
             for k, v in prev.items():
                 if k not in rec:
                     rec[k] = v
+        elif rec.get("code"):
+            # Truly new row added in the editor — default to "visible for no
+            # machines" so it must be explicitly opted in via the Machine
+            # Mapping tab.
+            rec.setdefault("machines", [])
         merged.append(rec)
     return merged
 

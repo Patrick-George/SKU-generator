@@ -573,7 +573,8 @@ def admin():
                     else:
                         fields[name] = {
                             "order": len(fields) + 1,
-                            "options": [{"type": "text", "code": "", "name": ""}] if ftype == "Text Input" else []
+                            "options": [{"type": "text", "code": "", "name": ""}] if ftype == "Text Input" else [],
+                            "machines": []
                         }
                         show_success(f"Field '{name}' added successfully!")
                         st.rerun()
@@ -943,8 +944,9 @@ def admin():
                         st.caption("Check fields that should be **visible** when this machine is selected. Unchecked fields will be hidden.")
                         field_checks = {}
                         for f in other_fields:
+                            has_machines_key = "machines" in fields[f]
                             current_machines = fields[f].get("machines", [])
-                            default_on = not current_machines or selected_machine_code in current_machines
+                            default_on = (not has_machines_key) or selected_machine_code in current_machines
                             field_checks[f] = st.checkbox(f, value=default_on, key=f"fv_{cat}_{selected_machine_code}_{f}")
 
                     if non_text_fields:
@@ -960,8 +962,9 @@ def admin():
                                     for i, opt in enumerate(opts):
                                         if not opt.get("code"):
                                             continue
+                                        has_machines_key = "machines" in opt
                                         opt_machines = opt.get("machines", [])
-                                        default_on = not opt_machines or selected_machine_code in opt_machines
+                                        default_on = (not has_machines_key) or selected_machine_code in opt_machines
                                         label = f"{opt['code']} - {opt.get('name', '')}"
                                         option_checks[f][i] = st.checkbox(label, value=default_on, key=f"ov_{cat}_{selected_machine_code}_{f}_{i}")
                                     st.markdown("---")
@@ -977,8 +980,9 @@ def admin():
                             for i, e in enumerate(extras):
                                 if not e.get("code"):
                                     continue
+                                has_machines_key = "machines" in e
                                 e_machines = e.get("machines", [])
-                                default_on = not e_machines or selected_machine_code in e_machines
+                                default_on = (not has_machines_key) or selected_machine_code in e_machines
                                 label = f"{e['code']} - {e.get('name', '')}"
                                 extras_checks[i] = st.checkbox(label, value=default_on, key=f"ev_{cat}_{selected_machine_code}_{i}")
                     else:
@@ -986,45 +990,47 @@ def admin():
 
                     all_machine_codes = [o["code"] for o in machine_opts if o.get("code")]
 
+                    # Save logic: always store an explicit `machines` list so that
+                    # "missing key" cleanly means "legacy / visible to all" and an
+                    # empty list cleanly means "visible to no machine". Items that
+                    # had no key (legacy data) get soft-migrated to the full code
+                    # list on first interaction with this tab.
                     for f in other_fields:
-                        current_machines = fields[f].get("machines", [])
-                        new_machines = set(current_machines) if current_machines else set(all_machine_codes)
+                        if "machines" in fields[f]:
+                            new_machines = set(fields[f]["machines"])
+                        else:
+                            new_machines = set(all_machine_codes)
                         if field_checks.get(f, True):
                             new_machines.add(selected_machine_code)
                         else:
                             new_machines.discard(selected_machine_code)
-                        if new_machines >= set(all_machine_codes):
-                            fields[f].pop("machines", None)
-                        else:
-                            fields[f]["machines"] = sorted(new_machines)
+                        fields[f]["machines"] = sorted(new_machines)
 
                     for f, opts_map in option_checks.items():
                         opts = fields[f]["options"]
                         for i, checked in opts_map.items():
                             opt = opts[i]
-                            current_machines = opt.get("machines", [])
-                            new_machines = set(current_machines) if current_machines else set(all_machine_codes)
+                            if "machines" in opt:
+                                new_machines = set(opt["machines"])
+                            else:
+                                new_machines = set(all_machine_codes)
                             if checked:
                                 new_machines.add(selected_machine_code)
                             else:
                                 new_machines.discard(selected_machine_code)
-                            if new_machines >= set(all_machine_codes):
-                                opt.pop("machines", None)
-                            else:
-                                opt["machines"] = sorted(new_machines)
+                            opt["machines"] = sorted(new_machines)
 
                     for i, checked in extras_checks.items():
                         e = extras[i]
-                        current_machines = e.get("machines", [])
-                        new_machines = set(current_machines) if current_machines else set(all_machine_codes)
+                        if "machines" in e:
+                            new_machines = set(e["machines"])
+                        else:
+                            new_machines = set(all_machine_codes)
                         if checked:
                             new_machines.add(selected_machine_code)
                         else:
                             new_machines.discard(selected_machine_code)
-                        if new_machines >= set(all_machine_codes):
-                            e.pop("machines", None)
-                        else:
-                            e["machines"] = sorted(new_machines)
+                        e["machines"] = sorted(new_machines)
 
     st.markdown("---")
 
