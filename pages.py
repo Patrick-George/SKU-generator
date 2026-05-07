@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import json
 import os
+from streamlit_sortables import sort_items
 
 from storage import GithubStorage
 from helpers import (
@@ -581,13 +582,18 @@ def admin():
 
         if fields:
             with st.expander("🔀 Field Order", expanded=False):
-                df = pd.DataFrame([{"Field": k, "Order": v["order"]} for k, v in fields.items()])
-                edited = st.data_editor(df, hide_index=True, use_container_width=True, key="field_order_editor")
-                for _, r in edited.iterrows():
-                    try:
-                        fields[r["Field"]]["order"] = int(r["Order"])
-                    except (ValueError, TypeError, KeyError):
-                        pass
+                st.caption("Drag fields to reorder them. The order from top to bottom is the order used in SKUs.")
+                current_order = ordered_fields(fields)
+                sorted_fields = sort_items(
+                    current_order,
+                    direction="vertical",
+                    key=f"field_order_sort_{cat}",
+                )
+                if sorted_fields and sorted_fields != current_order:
+                    for idx, fname in enumerate(sorted_fields, start=1):
+                        if fname in fields:
+                            fields[fname]["order"] = idx
+                    st.rerun()
 
             with st.expander("✏️ Rename / Delete Field", expanded=False):
                 field = st.selectbox("Select Field", ordered_fields(fields))
