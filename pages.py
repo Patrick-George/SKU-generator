@@ -394,7 +394,11 @@ def home():
                         </div>
                     </div>
 
-                    {'<!-- Item Name --><div><div class="section-label">Item Name</div>' + name_card_html + '</div>' if cat != "Blast Machine" else ''}
+                    <!-- Item Name -->
+                    <div>
+                        <div class="section-label">Item Name</div>
+                        {name_card_html}
+                    </div>
 
                     <!-- Item Description -->
                     <div>
@@ -429,8 +433,6 @@ def home():
 
                 total_items = len(all_breakdown_items)
                 card_height = 320 + (total_items * 30)
-                if cat == "Blast Machine":
-                    card_height -= 88
                 if mapped_desc and len(mapped_desc) > 80:
                     card_height += 30
                 if mapped_name and len(mapped_name) > 80:
