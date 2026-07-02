@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import json
 import os
+import html
 from streamlit_sortables import sort_items
 
 from storage import GithubStorage
@@ -20,6 +21,7 @@ from helpers import (
     generate_mapped_name_and_description,
     add_to_sku_history,
     decode_sku,
+    build_selection_from_decode,
     render_sidebar_nav,
     go,
     show_success,
@@ -1143,6 +1145,34 @@ def decoder_page():
         if results:
             best = results[0]
             st.success(f"✅ **Category Matched:** {best['category']}")
+
+            cat_data = inv[best["category"]]
+            sel, field_order, chosen, fittings_selected = build_selection_from_decode(best, cat_data)
+            item_name, item_desc = generate_mapped_name_and_description(
+                sel, field_order, chosen, fittings_selected
+            )
+
+            if item_name or item_desc:
+                st.markdown("#### Product Output")
+                if item_name:
+                    st.markdown("**Item Name**")
+                    st.markdown(
+                        f'<div style="background:#f0faf2;border:1.5px solid #c8e6cc;border-radius:8px;'
+                        f'padding:12px 16px;font-weight:600;color:#1b6e2a;">{html.escape(item_name)}</div>',
+                        unsafe_allow_html=True,
+                    )
+                if item_desc:
+                    st.markdown("**Item Description**")
+                    st.markdown(
+                        f'<div style="background:#faf8f0;border:1.5px solid #e6dfc8;border-radius:8px;'
+                        f'padding:12px 16px;color:#5a4e2b;">{html.escape(item_desc)}</div>',
+                        unsafe_allow_html=True,
+                    )
+            else:
+                st.info(
+                    "Item name and description could not be built — check that Tally Name and "
+                    "Description mappings are configured in Settings for this category."
+                )
 
             st.markdown("#### Component Breakdown:")
             for part in best['parts']:

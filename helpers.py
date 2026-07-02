@@ -812,3 +812,86 @@ def decode_sku(sku_code, inventory):
         r.pop("score", None)
 
     return candidates
+
+
+def _find_option_by_code(options, code):
+    """Return the first option whose code matches `code`, or None."""
+    code_str = str(code)
+    for opt in options or []:
+        if str(opt.get("code", "")) == code_str:
+            return opt
+    return None
+
+
+def build_selection_from_decode(decode_result, cat_data):
+    """
+    Rebuild sel/chosen structures from a decode result so that
+    generate_mapped_name_and_description can produce item name and description.
+    """
+    normalize_fields(cat_data)
+    fields = cat_data["fields"]
+    extras_list = cat_data.get("extras", [])
+    field_order = ordered_fields(fields)
+
+    sel = {}
+    fittings_selected = False
+
+    for part in decode_result.get("parts", []):
+        fname = part["field"]
+        if fname == "Manufacturer":
+            continue
+
+        code = part["code"]
+        if fname not in fields:
+            continue
+
+        opts = fields[fname].get("options", [])
+        is_text = opts and opts[0].get("type") == "text"
+
+        if is_text:
+            name = part.get("name", code)
+            sel[fname] = {
+                "code": code,
+                "name": name,
+                "tally_name": code,
+                "description": name,
+            }
+        else:
+            opt = _find_option_by_code(opts, code)
+            if opt:
+                sel[fname] = {
+                    "code": opt["code"],
+                    "name": opt.get("name", ""),
+                    "tally_name": opt.get("tally_name", ""),
+                    "description": opt.get("description", ""),
+                }
+            else:
+                sel[fname] = {
+                    "code": code,
+                    "name": part.get("name", ""),
+                    "tally_name": "",
+                    "description": "",
+                }
+
+        if fname.lower() == "fittings" and code and str(part.get("name", "")).lower() != "none":
+            fittings_selected = True
+
+    chosen = []
+    for extra in decode_result.get("extras", []):
+        opt = _find_option_by_code(extras_list, extra["code"])
+        if opt:
+            chosen.append({
+                "code": opt["code"],
+                "name": opt.get("name", ""),
+                "tally_name": opt.get("tally_name", ""),
+                "description": opt.get("description", ""),
+            })
+        else:
+            chosen.append({
+                "code": extra["code"],
+                "name": extra.get("name", ""),
+                "tally_name": "",
+                "description": "",
+            })
+
+    return sel, field_order, chosen, fittings_selected
