@@ -63,8 +63,8 @@ def generate_product_description(breakdown_items, category_name, sku):
 
 _FITTINGS_RULE = (
     'FITTINGS RULE: A fitting was selected. Append " + F" at the end of the item name. '
-    'For the item description, use the fitting\'s Description mapping (e.g. "A Fittings", "B Fittings") '
-    '— do NOT use the generic word "Fittings" alone.\n\n'
+    'For the item description, append " + " followed by the fitting\'s Description mapping '
+    '(e.g. "+ A Fittings", "+ B Fittings").\n\n'
 )
 
 
@@ -175,6 +175,7 @@ def generate_mapped_name_and_description(sel, ordered_field_names, chosen, fitti
     sel = _apply_whip_paint_override(sel)
     tally_parts = []
     desc_parts = []
+    fittings_desc = ""
     for k in ordered_field_names:
         s = sel.get(k)
         if not s or not s.get("code"):
@@ -184,9 +185,11 @@ def generate_mapped_name_and_description(sel, ordered_field_names, chosen, fitti
             tn = s.get("tally_name", "").strip()
             if tn:
                 tally_parts.append(tn)
-        dd = s.get("description", "").strip()
-        if dd:
-            desc_parts.append(dd)
+            dd = s.get("description", "").strip()
+            if dd:
+                desc_parts.append(dd)
+        else:
+            fittings_desc = s.get("description", "").strip()
 
     item_name = " ".join(tally_parts)
 
@@ -198,6 +201,9 @@ def generate_mapped_name_and_description(sel, ordered_field_names, chosen, fitti
         item_name += " + F"
 
     item_desc = " ".join(desc_parts)
+
+    if fittings_desc:
+        item_desc += " + " + fittings_desc
 
     if chosen:
         extras_desc = [c.get("tally_name", "").strip() or c.get("name", "") for c in chosen]
