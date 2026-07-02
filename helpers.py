@@ -62,9 +62,9 @@ def generate_product_description(breakdown_items, category_name, sku):
 
 
 _FITTINGS_RULE = (
-    'FITTINGS RULE: A fitting was selected. Append " + F" at the end of the item name, '
-    'and " + Fittings" at the end of the item description. '
-    'Do NOT include the specific fitting name or code.\n\n'
+    'FITTINGS RULE: A fitting was selected. Append " + F" at the end of the item name. '
+    'For the item description, use the fitting\'s Description mapping (e.g. "A Fittings", "B Fittings") '
+    '— do NOT use the generic word "Fittings" alone.\n\n'
 )
 
 
@@ -179,11 +179,11 @@ def generate_mapped_name_and_description(sel, ordered_field_names, chosen, fitti
         s = sel.get(k)
         if not s or not s.get("code"):
             continue
-        if k.lower() == "fittings":
-            continue
-        tn = s.get("tally_name", "").strip()
-        if tn:
-            tally_parts.append(tn)
+        is_fittings = k.lower() == "fittings"
+        if not is_fittings:
+            tn = s.get("tally_name", "").strip()
+            if tn:
+                tally_parts.append(tn)
         dd = s.get("description", "").strip()
         if dd:
             desc_parts.append(dd)
@@ -202,9 +202,6 @@ def generate_mapped_name_and_description(sel, ordered_field_names, chosen, fitti
     if chosen:
         extras_desc = [c.get("tally_name", "").strip() or c.get("name", "") for c in chosen]
         item_desc += " + Extras: " + ",".join(extras_desc)
-
-    if fittings_selected:
-        item_desc += " + Fittings"
 
     return item_name, item_desc
 
