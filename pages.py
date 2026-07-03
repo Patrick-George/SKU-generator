@@ -30,6 +30,7 @@ from helpers import (
     format_fitting_option,
     parse_fitting_parts,
     get_category_suffix,
+    is_text_field,
 )
 
 
@@ -201,8 +202,7 @@ def home():
             is_text = opts and opts[0].get("type") == "text"
             if is_text:
                 st.markdown(f"<p class='config-label'>{f}</p>", unsafe_allow_html=True)
-                text_val = st.text_input(f, help=f"Enter {f}", placeholder=f"Enter {f}", label_visibility="collapsed")
-                sel[f] = {"code": text_val, "name": text_val, "tally_name": text_val, "description": text_val}
+                st.text_input(f, help=f"Enter {f}", placeholder=f"Enter {f}", label_visibility="collapsed")
             else:
                 filtered_opts = filter_for_machine(opts, selected_machine_code) if selected_machine_code else opts
                 if filtered_opts:
@@ -285,7 +285,10 @@ def home():
                 st.info("No extras configured")
 
     # Calculate SKU
-    base = sep.join([sel[k]["code"] for k in ordered_fields(fields) if sel.get(k) and sel[k]["code"]])
+    base = sep.join([
+        sel[k]["code"] for k in ordered_fields(fields)
+        if sel.get(k) and sel[k]["code"] and not is_text_field(fields[k])
+    ])
     extras_codes = "".join([c["code"] for c in chosen])
     sku = base + (sep + "X" if base and extras_codes else "") + extras_codes
     cat_suffix = get_category_suffix(cat)
@@ -295,6 +298,8 @@ def home():
     breakdown_items = []
     fittings_selected = False
     for k in ordered_fields(fields):
+        if is_text_field(fields[k]):
+            continue
         if sel.get(k) and sel[k].get("code") and sel[k].get("name"):
             breakdown_items.append({"code": str(sel[k]["code"]), "name": str(sel[k]["name"]), "field": k})
             if k.lower() == "fittings":
@@ -308,7 +313,9 @@ def home():
     with right_col:
         with st.container():
             if sku:
-                mapped_name, mapped_desc = generate_mapped_name_and_description(sel, ordered_fields(fields), chosen, fittings_selected)
+                mapped_name, mapped_desc = generate_mapped_name_and_description(
+                    sel, ordered_fields(fields), chosen, fittings_selected, fields=fields
+                )
                 escaped_name = mapped_name.replace("'", "\\'").replace("`", "") if mapped_name else ""
                 escaped_desc = mapped_desc.replace("'", "\\'").replace("`", "") if mapped_desc else ""
 
@@ -1149,7 +1156,7 @@ def decoder_page():
             cat_data = inv[best["category"]]
             sel, field_order, chosen, fittings_selected = build_selection_from_decode(best, cat_data)
             item_name, item_desc = generate_mapped_name_and_description(
-                sel, field_order, chosen, fittings_selected
+                sel, field_order, chosen, fittings_selected, fields=cat_data["fields"]
             )
 
             if item_name or item_desc:

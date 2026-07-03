@@ -170,13 +170,15 @@ def _apply_whip_paint_override(sel):
     }
 
 
-def generate_mapped_name_and_description(sel, ordered_field_names, chosen, fittings_selected):
+def generate_mapped_name_and_description(sel, ordered_field_names, chosen, fittings_selected, fields=None):
     """Build item name and description deterministically from tally_name/description mappings."""
     sel = _apply_whip_paint_override(sel)
     tally_parts = []
     desc_parts = []
     fittings_desc = ""
     for k in ordered_field_names:
+        if fields and is_text_field(fields[k]):
+            continue
         s = sel.get(k)
         if not s or not s.get("code"):
             continue
@@ -256,6 +258,12 @@ def normalize_fields(cat):
 def ordered_fields(fields):
     """Return field names sorted by their order value."""
     return sorted(fields.keys(), key=lambda k: fields[k].get("order", 999))
+
+
+def is_text_field(field_data):
+    """Return True if the field is a free-text input (not part of SKU/name/description)."""
+    opts = field_data.get("options", [])
+    return bool(opts) and opts[0].get("type") == "text"
 
 
 def get_machine_field(cat_data):
