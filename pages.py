@@ -1176,38 +1176,20 @@ def history_page():
 
     st.markdown("""
         <style>
-        .history-cat-header {
-            font-size: 18px;
-            font-weight: 700;
-            color: #1a1a1a;
-            margin: 24px 0 12px 0;
-            padding-bottom: 8px;
-            border-bottom: 2px solid #e8eaed;
-        }
-        .history-machine-header {
-            font-size: 13px;
-            font-weight: 700;
-            color: #666;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            margin: 16px 0 8px 0;
-        }
         .history-empty-cat {
             color: #aaa;
             font-size: 13px;
             font-style: italic;
-            margin-bottom: 8px;
+            margin: 4px 0;
         }
         div[data-testid="stExpander"] details summary p {
-            font-family: 'SF Mono', 'Fira Code', monospace;
             font-weight: 600;
-            color: #1b6e2a;
         }
         </style>
     """, unsafe_allow_html=True)
 
     st.markdown("<h2 style='text-align: center;'>📋 SKU History</h2>", unsafe_allow_html=True)
-    st.markdown("<p style='text-align: center; color: #666;'>Saved SKU codes grouped by category and machine</p>", unsafe_allow_html=True)
+    st.markdown("<p style='text-align: center; color: #666;'>Browse saved SKUs by category and machine</p>", unsafe_allow_html=True)
 
     st.markdown("---")
 
@@ -1225,22 +1207,24 @@ def history_page():
     category_order = HISTORY_CATEGORY_ORDER + extra_categories
 
     for cat in category_order:
-        st.markdown(f"<div class='history-cat-header'>{html.escape(cat)}</div>", unsafe_allow_html=True)
         machine_groups = grouped.get(cat, {})
+        cat_count = sum(len(entries) for entries in machine_groups.values())
+        cat_label = f"**{cat}**" + (f"  ·  {cat_count} SKU{'s' if cat_count != 1 else ''}" if cat_count else "")
 
-        if not machine_groups:
-            st.markdown("<p class='history-empty-cat'>No SKUs saved yet for this category.</p>", unsafe_allow_html=True)
-            continue
+        with st.expander(cat_label, expanded=False):
+            if not machine_groups:
+                st.markdown("<p class='history-empty-cat'>No SKUs saved yet for this category.</p>", unsafe_allow_html=True)
+                continue
 
-        for (mcode, mname) in sorted(machine_groups.keys(), key=lambda k: (k[0] == "—", k[0])):
-            st.markdown(
-                f"<div class='history-machine-header'>{html.escape(str(mcode))} — {html.escape(mname)}</div>",
-                unsafe_allow_html=True,
-            )
-            for entry in machine_groups[(mcode, mname)]:
-                expander_label = f"{entry['sku']}  ·  {entry['timestamp']}"
-                with st.expander(expander_label, expanded=False):
-                    _render_history_entry_detail(entry, inventory)
+            for (mcode, mname) in sorted(machine_groups.keys(), key=lambda k: (k[0] == "—", k[0])):
+                entries = machine_groups[(mcode, mname)]
+                machine_label = f"**{mcode}** — {mname}  ·  {len(entries)} SKU{'s' if len(entries) != 1 else ''}"
+
+                with st.expander(machine_label, expanded=False):
+                    for entry in entries:
+                        sku_label = f"`{entry['sku']}`  ·  {entry['timestamp']}"
+                        with st.expander(sku_label, expanded=False):
+                            _render_history_entry_detail(entry, inventory)
 
     st.markdown("---")
     if st.button("🗑️ Clear All History", type="secondary"):
