@@ -12,7 +12,9 @@ COPY_BOX_HEIGHT = 160
 DEFAULT_SEPARATOR = ""
 DEFAULT_EXTRAS_MODE = "Multiple"
 EXTRAS_PER_PAGE = 8
-MAX_SKU_HISTORY = 15
+MAX_SKU_HISTORY = 50
+
+HISTORY_CATEGORY_ORDER = ["Blast Machine", "Air Receiver", "Hose"]
 
 # Per-category suffix appended to every generated SKU. Used to encode
 # manufacturer/source identity that doesn't vary across configurations
@@ -526,7 +528,55 @@ def render_sidebar_nav(current_page="home"):
         go("login")
 
 
-def add_to_sku_history(sku, description, category):
+def get_history_machine_key(entry, inventory):
+    """Return (machine_code, machine_name) for grouping a history entry."""
+    machine_code = entry.get("machine_code")
+    machine_name = entry.get("machine_name")
+    if machine_code:
+        return machine_code, machine_name or machine_code
+
+    cat = entry.get("category")
+    config = entry.get("config") or {}
+    if cat and cat in inventory:
+        mf_name = get_machine_field(inventory[cat])
+        machine_info = config.get(mf_name, {})
+        if machine_info.get("code"):
+            return machine_info["code"], machine_info.get("name") or machine_info["code"]
+
+        sku = entry.get("sku")
+        if sku:
+            decode_results = decode_sku(sku, inventory)
+            cat_match = next((r for r in decode_results if r.get("category") == cat), None)
+            if cat_match:
+                for part in cat_match.get("parts", []):
+                    if part.get("field") == mf_name:
+                        return part["code"], part.get("name", part["code"])
+
+    return "—", "Unknown"
+
+
+def group_sku_history(history, inventory):
+    """Group history entries by category, then by machine field."""
+    grouped = {}
+    for entry in history:
+        cat = entry.get("category", "Other")
+        mcode, mname = get_history_machine_key(entry, inventory)
+        grouped.setdefault(cat, {}).setdefault((mcode, mname), []).append(entry)
+    return grouped
+
+
+def add_to_sku_history(
+    sku,
+    description,
+    category,
+    *,
+    config=None,
+    extras=None,
+    machine_code=None,
+    machine_name=None,
+    mapped_name=None,
+    breakdown_items=None,
+):
     """Add a SKU to history (avoid duplicates, limit size). Persists to disk."""
     if not sku:
         return
@@ -541,7 +591,13 @@ def add_to_sku_history(sku, description, category):
         "sku": sku,
         "description": description,
         "category": category,
-        "timestamp": pd.Timestamp.now().strftime("%Y-%m-%d %H:%M")
+        "timestamp": pd.Timestamp.now().strftime("%Y-%m-%d %H:%M"),
+        "config": config or {},
+        "extras": extras or [],
+        "machine_code": machine_code,
+        "machine_name": machine_name,
+        "mapped_name": mapped_name,
+        "breakdown_items": breakdown_items or [],
     }
 
     history = [h for h in history if h["sku"] != sku]

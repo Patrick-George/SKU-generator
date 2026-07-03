@@ -20,6 +20,8 @@ from helpers import (
     generate_full_matrix,
     generate_mapped_name_and_description,
     add_to_sku_history,
+    HISTORY_CATEGORY_ORDER,
+    group_sku_history,
     decode_sku,
     build_selection_from_decode,
     render_sidebar_nav,
@@ -448,7 +450,18 @@ def home():
 
                 sku_description = mapped_desc or " - ".join([item['name'] for item in all_breakdown_items])
                 if st.button("💾 Save to History", key="save_history", use_container_width=False):
-                    add_to_sku_history(sku, sku_description, cat)
+                    machine_name = sel.get(mf_name, {}).get("name") if mf_name and sel.get(mf_name) else None
+                    add_to_sku_history(
+                        sku,
+                        sku_description,
+                        cat,
+                        config=sel,
+                        extras=chosen,
+                        machine_code=selected_machine_code,
+                        machine_name=machine_name,
+                        mapped_name=mapped_name,
+                        breakdown_items=all_breakdown_items,
+                    )
                     st.toast(f"Saved: {sku}")
                     st.rerun()
 
@@ -1062,56 +1075,180 @@ def admin():
 # ==================================================
 # HISTORY PAGE
 # ==================================================
+def _render_history_entry_detail(entry, inventory):
+    """Show the full configuration saved with a history entry."""
+    cat = entry.get("category")
+    config = entry.get("config") or {}
+    extras = entry.get("extras") or []
+    breakdown = entry.get("breakdown_items") or []
+    mapped_name = entry.get("mapped_name")
+    mapped_desc = entry.get("description")
+
+    if not config and cat in inventory:
+        decode_results = decode_sku(entry.get("sku", ""), inventory)
+        cat_match = next((r for r in decode_results if r.get("category") == cat), None)
+        if not cat_match and decode_results:
+            cat_match = decode_results[0]
+        if cat_match:
+            cat_data = inventory.get(cat_match["category"], inventory.get(cat, {}))
+            if cat_data:
+                config, field_order, extras, fittings_selected = build_selection_from_decode(
+                    cat_match, cat_data
+                )
+                if not breakdown:
+                    breakdown = [
+                        {"code": p["code"], "name": p.get("name", ""), "field": p["field"]}
+                        for p in cat_match.get("parts", [])
+                    ]
+                    breakdown += [
+                        {"code": e["code"], "name": e.get("name", "")}
+                        for e in cat_match.get("extras", [])
+                    ]
+                if not mapped_name or not mapped_desc:
+                    mapped_name, mapped_desc = generate_mapped_name_and_description(
+                        config, field_order, extras, fittings_selected, fields=cat_data.get("fields")
+                    )
+
+    sku_escaped = html.escape(entry.get("sku", ""))
+    copy_html = f"""
+    <button onclick="navigator.clipboard.writeText('{sku_escaped}'); this.innerText='✓ Copied'"
+        style="background: #e8f4fd; border: 1px solid #1a73e8; border-radius: 6px;
+        padding: 5px 12px; cursor: pointer; color: #1a73e8; font-size: 12px; margin-bottom: 12px;">
+        📋 Copy SKU
+    </button>
+    """
+    st.markdown(copy_html, unsafe_allow_html=True)
+
+    if mapped_name and cat != "Blast Machine":
+        st.markdown("**Item Name**")
+        st.markdown(f"<div style='background:#f0faf2;border:1px solid #c8e6cc;border-radius:8px;padding:10px 14px;font-weight:600;color:#1b6e2a;'>{html.escape(mapped_name)}</div>", unsafe_allow_html=True)
+
+    if mapped_desc:
+        st.markdown("**Item Description**")
+        st.markdown(f"<div style='background:#faf8f0;border:1px solid #e6dfc8;border-radius:8px;padding:10px 14px;color:#5a4e2b;'>{html.escape(mapped_desc)}</div>", unsafe_allow_html=True)
+
+    if config:
+        st.markdown("**Configuration**")
+        for field_name, field_val in config.items():
+            code = field_val.get("code", "")
+            name = field_val.get("name", "")
+            st.markdown(
+                f"<div style='display:flex;gap:10px;align-items:center;padding:4px 0;font-size:13px;'>"
+                f"<span style='min-width:120px;color:#888;font-weight:600;'>{html.escape(field_name)}</span>"
+                f"<span style='background:#eef2f7;color:#3366aa;padding:2px 8px;border-radius:4px;font-family:monospace;font-size:12px;'>{html.escape(str(code))}</span>"
+                f"<span style='color:#444;'>{html.escape(name)}</span>"
+                f"</div>",
+                unsafe_allow_html=True,
+            )
+
+    if extras:
+        st.markdown("**Extras**")
+        for extra in extras:
+            st.markdown(
+                f"<div style='display:flex;gap:10px;align-items:center;padding:4px 0;font-size:13px;'>"
+                f"<span style='background:#eef2f7;color:#3366aa;padding:2px 8px;border-radius:4px;font-family:monospace;font-size:12px;'>{html.escape(str(extra.get('code', '')))}</span>"
+                f"<span style='color:#444;'>{html.escape(extra.get('name', ''))}</span>"
+                f"</div>",
+                unsafe_allow_html=True,
+            )
+
+    if breakdown:
+        st.markdown("**SKU Breakdown**")
+        for item in breakdown:
+            field_label = item.get("field")
+            prefix = f"{html.escape(field_label)}: " if field_label else ""
+            st.markdown(
+                f"<div style='display:flex;gap:8px;align-items:center;padding:3px 0;font-size:13px;color:#555;'>"
+                f"<span style='background:#eef2f7;color:#3366aa;padding:2px 8px;border-radius:4px;font-family:monospace;font-size:12px;'>{html.escape(str(item.get('code', '')))}</span>"
+                f"<span>{prefix}{html.escape(item.get('name', ''))}</span>"
+                f"</div>",
+                unsafe_allow_html=True,
+            )
+
+    if not config and not breakdown:
+        st.caption("Configuration snapshot not available for this entry.")
+
+
 def history_page():
     """SKU History page."""
     with st.sidebar:
         render_sidebar_nav("history")
 
+    st.markdown("""
+        <style>
+        .history-cat-header {
+            font-size: 18px;
+            font-weight: 700;
+            color: #1a1a1a;
+            margin: 24px 0 12px 0;
+            padding-bottom: 8px;
+            border-bottom: 2px solid #e8eaed;
+        }
+        .history-machine-header {
+            font-size: 13px;
+            font-weight: 700;
+            color: #666;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin: 16px 0 8px 0;
+        }
+        .history-empty-cat {
+            color: #aaa;
+            font-size: 13px;
+            font-style: italic;
+            margin-bottom: 8px;
+        }
+        div[data-testid="stExpander"] details summary p {
+            font-family: 'SF Mono', 'Fira Code', monospace;
+            font-weight: 600;
+            color: #1b6e2a;
+        }
+        </style>
+    """, unsafe_allow_html=True)
+
     st.markdown("<h2 style='text-align: center;'>📋 SKU History</h2>", unsafe_allow_html=True)
-    st.markdown("<p style='text-align: center; color: #666;'>Recently generated SKU codes</p>", unsafe_allow_html=True)
+    st.markdown("<p style='text-align: center; color: #666;'>Saved SKU codes grouped by category and machine</p>", unsafe_allow_html=True)
 
     st.markdown("---")
 
     history = st.session_state.get("sku_history", [])
+    inventory = st.session_state.get("sku_data", {}).get("inventory", {})
+    grouped = group_sku_history(history, inventory)
 
-    if history:
-        for idx, entry in enumerate(history):
-            col1, col2, col3, col4 = st.columns([3, 2, 2, 1])
-
-            with col1:
-                st.markdown(f"### `{entry['sku']}`")
-            with col2:
-                st.markdown(f"**{entry['category']}**")
-            with col3:
-                st.caption(entry['timestamp'])
-            with col4:
-                copy_html = f"""
-                <button onclick="navigator.clipboard.writeText('{entry['sku']}'); this.innerText='✓ Copied'"
-                    style="background: #e8f4fd; border: 1px solid #1a73e8; border-radius: 6px;
-                    padding: 5px 10px; cursor: pointer; color: #1a73e8; font-size: 12px;">
-                    📋 Copy
-                </button>
-                """
-                st.markdown(copy_html, unsafe_allow_html=True)
-
-            if entry.get('description'):
-                st.caption(f"↳ {entry['description']}")
-
-            st.markdown("<hr style='margin: 10px 0; border: none; border-top: 1px solid #eee;'>", unsafe_allow_html=True)
-
-        st.markdown("---")
-        col1, col2, col3 = st.columns([1, 1, 2])
-        with col1:
-            if st.button("🗑️ Clear All History", type="secondary"):
-                GithubStorage().save_history([])
-                st.session_state["sku_history"] = []
-                if "sku_data" in st.session_state:
-                    st.session_state["sku_data"]["sku_history"] = []
-                st.rerun()
-    else:
-        st.info("📭 No SKU history yet. Generate some SKUs to see them here!")
+    if not history:
+        st.info("📭 No SKU history yet. Generate some SKUs and click **Save to History** to see them here!")
         if st.button("🏠 Go to SKU Generator"):
             go("home")
+        return
+
+    extra_categories = sorted(c for c in grouped if c not in HISTORY_CATEGORY_ORDER)
+    category_order = HISTORY_CATEGORY_ORDER + extra_categories
+
+    for cat in category_order:
+        st.markdown(f"<div class='history-cat-header'>{html.escape(cat)}</div>", unsafe_allow_html=True)
+        machine_groups = grouped.get(cat, {})
+
+        if not machine_groups:
+            st.markdown("<p class='history-empty-cat'>No SKUs saved yet for this category.</p>", unsafe_allow_html=True)
+            continue
+
+        for (mcode, mname) in sorted(machine_groups.keys(), key=lambda k: (k[0] == "—", k[0])):
+            st.markdown(
+                f"<div class='history-machine-header'>{html.escape(str(mcode))} — {html.escape(mname)}</div>",
+                unsafe_allow_html=True,
+            )
+            for entry in machine_groups[(mcode, mname)]:
+                expander_label = f"{entry['sku']}  ·  {entry['timestamp']}"
+                with st.expander(expander_label, expanded=False):
+                    _render_history_entry_detail(entry, inventory)
+
+    st.markdown("---")
+    if st.button("🗑️ Clear All History", type="secondary"):
+        GithubStorage().save_history([])
+        st.session_state["sku_history"] = []
+        if "sku_data" in st.session_state:
+            st.session_state["sku_data"]["sku_history"] = []
+        st.rerun()
 
 
 # ==================================================
