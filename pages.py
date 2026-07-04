@@ -22,6 +22,7 @@ from helpers import (
     add_to_sku_history,
     HISTORY_CATEGORY_ORDER,
     group_sku_history,
+    format_history_timestamp,
     decode_sku,
     build_selection_from_decode,
     render_sidebar_nav,
@@ -1153,19 +1154,31 @@ def _render_history_entry_detail(entry, inventory):
     copy_html = f"""
     <button onclick="navigator.clipboard.writeText('{sku_escaped}'); this.innerText='✓ Copied'"
         style="background: #e8f4fd; border: 1px solid #1a73e8; border-radius: 6px;
-        padding: 5px 12px; cursor: pointer; color: #1a73e8; font-size: 12px; margin-bottom: 12px;">
+        padding: 7px 14px; cursor: pointer; color: #1a73e8; font-size: 15px; margin-bottom: 12px;">
         📋 Copy SKU
     </button>
     """
     st.markdown(copy_html, unsafe_allow_html=True)
 
+    date_str, time_str = format_history_timestamp(entry.get("timestamp"))
+    if date_str or time_str:
+        st.markdown(
+            f"<div style='display:flex;gap:24px;margin-bottom:14px;font-size:15px;'>"
+            f"<div><span style='color:#888;font-weight:600;'>Date</span>"
+            f"<div style='color:#222;font-weight:600;'>{html.escape(date_str)}</div></div>"
+            f"<div><span style='color:#888;font-weight:600;'>Time</span>"
+            f"<div style='color:#222;font-weight:600;'>{html.escape(time_str)} IST</div></div>"
+            f"</div>",
+            unsafe_allow_html=True,
+        )
+
     if mapped_name and cat != "Blast Machine":
         st.markdown("**Item Name**")
-        st.markdown(f"<div style='background:#f0faf2;border:1px solid #c8e6cc;border-radius:8px;padding:10px 14px;font-weight:600;color:#1b6e2a;'>{html.escape(mapped_name)}</div>", unsafe_allow_html=True)
+        st.markdown(f"<div style='background:#f0faf2;border:1px solid #c8e6cc;border-radius:8px;padding:10px 14px;font-weight:600;font-size:16px;color:#1b6e2a;'>{html.escape(mapped_name)}</div>", unsafe_allow_html=True)
 
     if mapped_desc:
         st.markdown("**Item Description**")
-        st.markdown(f"<div style='background:#faf8f0;border:1px solid #e6dfc8;border-radius:8px;padding:10px 14px;color:#5a4e2b;'>{html.escape(mapped_desc)}</div>", unsafe_allow_html=True)
+        st.markdown(f"<div style='background:#faf8f0;border:1px solid #e6dfc8;border-radius:8px;padding:10px 14px;font-size:15px;color:#5a4e2b;'>{html.escape(mapped_desc)}</div>", unsafe_allow_html=True)
 
     if config:
         st.markdown("**Configuration**")
@@ -1175,7 +1188,7 @@ def _render_history_entry_detail(entry, inventory):
             is_text = field_val.get("is_text") or (not code and name)
             if is_text:
                 st.markdown(
-                    f"<div style='padding:4px 0;font-size:13px;'>"
+                    f"<div style='padding:5px 0;font-size:15px;'>"
                     f"<span style='color:#888;font-weight:600;'>{html.escape(field_name)}</span>"
                     f"<div style='margin-top:3px;color:#444;white-space:pre-wrap;background:#f8f9fb;"
                     f"border:1px solid #e8eaed;border-radius:6px;padding:8px 12px;'>{html.escape(name)}</div>"
@@ -1184,9 +1197,9 @@ def _render_history_entry_detail(entry, inventory):
                 )
             else:
                 st.markdown(
-                    f"<div style='display:flex;gap:10px;align-items:center;padding:4px 0;font-size:13px;'>"
-                    f"<span style='min-width:120px;color:#888;font-weight:600;'>{html.escape(field_name)}</span>"
-                    f"<span style='background:#eef2f7;color:#3366aa;padding:2px 8px;border-radius:4px;font-family:monospace;font-size:12px;'>{html.escape(str(code))}</span>"
+                    f"<div style='display:flex;gap:10px;align-items:center;padding:5px 0;font-size:15px;'>"
+                    f"<span style='min-width:130px;color:#888;font-weight:600;'>{html.escape(field_name)}</span>"
+                    f"<span style='background:#eef2f7;color:#3366aa;padding:2px 8px;border-radius:4px;font-family:monospace;font-size:14px;'>{html.escape(str(code))}</span>"
                     f"<span style='color:#444;'>{html.escape(name)}</span>"
                     f"</div>",
                     unsafe_allow_html=True,
@@ -1196,8 +1209,8 @@ def _render_history_entry_detail(entry, inventory):
         st.markdown("**Extras**")
         for extra in extras:
             st.markdown(
-                f"<div style='display:flex;gap:10px;align-items:center;padding:4px 0;font-size:13px;'>"
-                f"<span style='background:#eef2f7;color:#3366aa;padding:2px 8px;border-radius:4px;font-family:monospace;font-size:12px;'>{html.escape(str(extra.get('code', '')))}</span>"
+                f"<div style='display:flex;gap:10px;align-items:center;padding:5px 0;font-size:15px;'>"
+                f"<span style='background:#eef2f7;color:#3366aa;padding:2px 8px;border-radius:4px;font-family:monospace;font-size:14px;'>{html.escape(str(extra.get('code', '')))}</span>"
                 f"<span style='color:#444;'>{html.escape(extra.get('name', ''))}</span>"
                 f"</div>",
                 unsafe_allow_html=True,
@@ -1209,8 +1222,8 @@ def _render_history_entry_detail(entry, inventory):
             field_label = item.get("field")
             prefix = f"{html.escape(field_label)}: " if field_label else ""
             st.markdown(
-                f"<div style='display:flex;gap:8px;align-items:center;padding:3px 0;font-size:13px;color:#555;'>"
-                f"<span style='background:#eef2f7;color:#3366aa;padding:2px 8px;border-radius:4px;font-family:monospace;font-size:12px;'>{html.escape(str(item.get('code', '')))}</span>"
+                f"<div style='display:flex;gap:8px;align-items:center;padding:4px 0;font-size:15px;color:#555;'>"
+                f"<span style='background:#eef2f7;color:#3366aa;padding:2px 8px;border-radius:4px;font-family:monospace;font-size:14px;'>{html.escape(str(item.get('code', '')))}</span>"
                 f"<span>{prefix}{html.escape(item.get('name', ''))}</span>"
                 f"</div>",
                 unsafe_allow_html=True,
@@ -1280,7 +1293,8 @@ def _render_history_skus(cat, machine, grouped, inventory):
         return
 
     for entry in entries:
-        sku_label = f"`{entry['sku']}`  ·  {entry['timestamp']}"
+        date_str, time_str = format_history_timestamp(entry.get("timestamp"))
+        sku_label = f"{entry['sku']}   —   Date: {date_str}   ·   Time: {time_str}"
         with st.expander(sku_label, expanded=False):
             _render_history_entry_detail(entry, inventory)
 
@@ -1294,12 +1308,26 @@ def history_page():
         <style>
         .history-empty-cat {
             color: #aaa;
-            font-size: 13px;
+            font-size: 15px;
             font-style: italic;
             margin: 4px 0;
         }
+        /* Bigger expander (SKU row) label */
         div[data-testid="stExpander"] details summary p {
             font-weight: 600;
+            font-size: 16px !important;
+        }
+        /* Bigger category / machine / back navigation buttons */
+        div[data-testid="stButton"] button p {
+            font-size: 16px !important;
+            font-weight: 600;
+        }
+        /* Bigger section headers inside history */
+        .history-detail-label {
+            font-size: 15px;
+            font-weight: 700;
+            color: #333;
+            margin: 10px 0 4px 0;
         }
         </style>
     """, unsafe_allow_html=True)

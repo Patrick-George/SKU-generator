@@ -555,6 +555,30 @@ def get_history_machine_key(entry, inventory):
     return "—", "Unknown"
 
 
+def now_ist():
+    """Return the current time in Indian Standard Time (UTC+5:30) as a naive timestamp."""
+    return (pd.Timestamp.now(tz="UTC") + pd.Timedelta(hours=5, minutes=30)).tz_localize(None)
+
+
+def format_history_timestamp(ts):
+    """Parse a stored timestamp and return (date_str dd/mm/yyyy, time_str hh:mm AM/PM)."""
+    if not ts:
+        return "", ""
+    dt = None
+    for fmt in ("%d/%m/%Y %H:%M", "%Y-%m-%d %H:%M", "%Y-%m-%d %H:%M:%S"):
+        try:
+            dt = pd.to_datetime(ts, format=fmt)
+            break
+        except (ValueError, TypeError):
+            continue
+    if dt is None:
+        try:
+            dt = pd.to_datetime(ts)
+        except (ValueError, TypeError):
+            return str(ts), ""
+    return dt.strftime("%d/%m/%Y"), dt.strftime("%I:%M %p")
+
+
 def group_sku_history(history, inventory):
     """Group history entries by category, then by machine field."""
     grouped = {}
@@ -591,7 +615,7 @@ def add_to_sku_history(
         "sku": sku,
         "description": description,
         "category": category,
-        "timestamp": pd.Timestamp.now().strftime("%Y-%m-%d %H:%M"),
+        "timestamp": now_ist().strftime("%d/%m/%Y %H:%M"),
         "config": config or {},
         "extras": extras or [],
         "machine_code": machine_code,
