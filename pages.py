@@ -1169,8 +1169,73 @@ def _render_history_entry_detail(entry, inventory):
         st.caption("Configuration snapshot not available for this entry.")
 
 
+def _history_goto(cat=None, machine=None):
+    """Set history drill-down navigation state and rerun."""
+    st.session_state["history_cat"] = cat
+    st.session_state["history_machine"] = machine
+    st.rerun()
+
+
+def _render_history_categories(grouped, inventory):
+    """Level 0: one button per main category."""
+    st.markdown("<p style='text-align: center; color: #666;'>Select a category</p>", unsafe_allow_html=True)
+    st.markdown("---")
+
+    extra_categories = sorted(c for c in grouped if c not in HISTORY_CATEGORY_ORDER)
+    category_order = HISTORY_CATEGORY_ORDER + extra_categories
+
+    for cat in category_order:
+        machine_groups = grouped.get(cat, {})
+        cat_count = sum(len(entries) for entries in machine_groups.values())
+        label = f"{cat}  ·  {cat_count} SKU{'s' if cat_count != 1 else ''}"
+        if st.button(label, key=f"hist_cat_{cat}", use_container_width=True, disabled=cat_count == 0):
+            _history_goto(cat=cat)
+
+
+def _render_history_machines(cat, grouped, inventory):
+    """Level 1: one button per machine within a category."""
+    if st.button("← Back to categories", key="hist_back_cats"):
+        _history_goto()
+
+    st.markdown(f"<h3 style='text-align:center;'>{html.escape(cat)}</h3>", unsafe_allow_html=True)
+    st.markdown("<p style='text-align: center; color: #666;'>Select a machine</p>", unsafe_allow_html=True)
+    st.markdown("---")
+
+    machine_groups = grouped.get(cat, {})
+    if not machine_groups:
+        st.markdown("<p class='history-empty-cat'>No SKUs saved yet for this category.</p>", unsafe_allow_html=True)
+        return
+
+    for (mcode, mname) in sorted(machine_groups.keys(), key=lambda k: (k[0] == "—", k[0])):
+        entries = machine_groups[(mcode, mname)]
+        label = f"{mcode} — {mname}  ·  {len(entries)} SKU{'s' if len(entries) != 1 else ''}"
+        if st.button(label, key=f"hist_machine_{mcode}_{mname}", use_container_width=True):
+            _history_goto(cat=cat, machine=(mcode, mname))
+
+
+def _render_history_skus(cat, machine, grouped, inventory):
+    """Level 2: list of SKUs for a machine, each expandable to full config."""
+    mcode, mname = machine
+    if st.button("← Back to machines", key="hist_back_machines"):
+        _history_goto(cat=cat)
+
+    st.markdown(f"<h3 style='text-align:center;'>{html.escape(cat)}</h3>", unsafe_allow_html=True)
+    st.markdown(f"<p style='text-align: center; color: #666;'>{html.escape(str(mcode))} — {html.escape(mname)}</p>", unsafe_allow_html=True)
+    st.markdown("---")
+
+    entries = grouped.get(cat, {}).get(machine, [])
+    if not entries:
+        st.markdown("<p class='history-empty-cat'>No SKUs saved for this machine.</p>", unsafe_allow_html=True)
+        return
+
+    for entry in entries:
+        sku_label = f"`{entry['sku']}`  ·  {entry['timestamp']}"
+        with st.expander(sku_label, expanded=False):
+            _render_history_entry_detail(entry, inventory)
+
+
 def history_page():
-    """SKU History page."""
+    """SKU History page with category → machine → SKU drill-down."""
     with st.sidebar:
         render_sidebar_nav("history")
 
@@ -1189,42 +1254,27 @@ def history_page():
     """, unsafe_allow_html=True)
 
     st.markdown("<h2 style='text-align: center;'>📋 SKU History</h2>", unsafe_allow_html=True)
-    st.markdown("<p style='text-align: center; color: #666;'>Browse saved SKUs by category and machine</p>", unsafe_allow_html=True)
-
-    st.markdown("---")
 
     history = st.session_state.get("sku_history", [])
     inventory = st.session_state.get("sku_data", {}).get("inventory", {})
     grouped = group_sku_history(history, inventory)
 
     if not history:
+        st.markdown("---")
         st.info("📭 No SKU history yet. Generate some SKUs and click **Save to History** to see them here!")
         if st.button("🏠 Go to SKU Generator"):
             go("home")
         return
 
-    extra_categories = sorted(c for c in grouped if c not in HISTORY_CATEGORY_ORDER)
-    category_order = HISTORY_CATEGORY_ORDER + extra_categories
+    selected_cat = st.session_state.get("history_cat")
+    selected_machine = st.session_state.get("history_machine")
 
-    for cat in category_order:
-        machine_groups = grouped.get(cat, {})
-        cat_count = sum(len(entries) for entries in machine_groups.values())
-        cat_label = f"**{cat}**" + (f"  ·  {cat_count} SKU{'s' if cat_count != 1 else ''}" if cat_count else "")
-
-        with st.expander(cat_label, expanded=False):
-            if not machine_groups:
-                st.markdown("<p class='history-empty-cat'>No SKUs saved yet for this category.</p>", unsafe_allow_html=True)
-                continue
-
-            for (mcode, mname) in sorted(machine_groups.keys(), key=lambda k: (k[0] == "—", k[0])):
-                entries = machine_groups[(mcode, mname)]
-                machine_label = f"**{mcode}** — {mname}  ·  {len(entries)} SKU{'s' if len(entries) != 1 else ''}"
-
-                with st.expander(machine_label, expanded=False):
-                    for entry in entries:
-                        sku_label = f"`{entry['sku']}`  ·  {entry['timestamp']}"
-                        with st.expander(sku_label, expanded=False):
-                            _render_history_entry_detail(entry, inventory)
+    if selected_cat and selected_cat in grouped and selected_machine and selected_machine in grouped[selected_cat]:
+        _render_history_skus(selected_cat, selected_machine, grouped, inventory)
+    elif selected_cat:
+        _render_history_machines(selected_cat, grouped, inventory)
+    else:
+        _render_history_categories(grouped, inventory)
 
     st.markdown("---")
     if st.button("🗑️ Clear All History", type="secondary"):
@@ -1232,6 +1282,8 @@ def history_page():
         st.session_state["sku_history"] = []
         if "sku_data" in st.session_state:
             st.session_state["sku_data"]["sku_history"] = []
+        st.session_state["history_cat"] = None
+        st.session_state["history_machine"] = None
         st.rerun()
 
 
