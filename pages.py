@@ -203,14 +203,25 @@ def home():
             opts = fields[f]["options"]
             is_text = opts and opts[0].get("type") == "text"
             if is_text:
+                is_multiline = bool(opts[0].get("multiline"))
                 st.markdown(f"<p class='config-label'>{f}</p>", unsafe_allow_html=True)
-                txt_val = st.text_input(
-                    f,
-                    key=f"textfield_{cat}_{f}",
-                    help=f"Enter {f}",
-                    placeholder=f"Enter {f}",
-                    label_visibility="collapsed",
-                )
+                if is_multiline:
+                    txt_val = st.text_area(
+                        f,
+                        key=f"textfield_{cat}_{f}",
+                        help=f"Enter {f}",
+                        placeholder=f"Enter {f}",
+                        label_visibility="collapsed",
+                        height=120,
+                    )
+                else:
+                    txt_val = st.text_input(
+                        f,
+                        key=f"textfield_{cat}_{f}",
+                        help=f"Enter {f}",
+                        placeholder=f"Enter {f}",
+                        label_visibility="collapsed",
+                    )
                 if txt_val and txt_val.strip():
                     clean = txt_val.strip()
                     sel[f] = {"code": "", "name": clean, "tally_name": "", "description": clean, "is_text": True}
@@ -598,14 +609,20 @@ def admin():
             with st.form("add_field"):
                 a, b, c = st.columns([2, 1, 1])
                 name = a.text_input("Field Name")
-                ftype = c.selectbox("Type", ["Dropdown", "Text Input"])
+                ftype = c.selectbox("Type", ["Dropdown", "Text Input", "Multi-line Text"])
                 if b.form_submit_button("Add") and name:
                     if name in fields:
                         show_error(f"Field '{name}' already exists!")
                     else:
+                        if ftype == "Text Input":
+                            new_options = [{"type": "text", "code": "", "name": ""}]
+                        elif ftype == "Multi-line Text":
+                            new_options = [{"type": "text", "multiline": True, "code": "", "name": ""}]
+                        else:
+                            new_options = []
                         fields[name] = {
                             "order": len(fields) + 1,
-                            "options": [{"type": "text", "code": "", "name": ""}] if ftype == "Text Input" else [],
+                            "options": new_options,
                             "machines": []
                         }
                         show_success(f"Field '{name}' added successfully!")
@@ -664,6 +681,20 @@ def admin():
                 opts = fields[field_for_options]["options"]
                 if opts and opts[0].get("type") == "text":
                     st.info("This is a text input field - users will enter values manually.")
+                    is_multiline = bool(opts[0].get("multiline"))
+                    new_multiline = st.toggle(
+                        "Multi-line input (large text box)",
+                        value=is_multiline,
+                        key=f"multiline_toggle_{cat}_{field_for_options}",
+                        help="Enable for long, multi-line text such as customization notes.",
+                    )
+                    if new_multiline != is_multiline:
+                        if new_multiline:
+                            opts[0]["multiline"] = True
+                        else:
+                            opts[0].pop("multiline", None)
+                        show_success("Field updated. Remember to save changes.")
+                        st.rerun()
                 else:
                     x_codes = [o for o in opts if str(o.get("code", "")).upper() == "X"]
                     if x_codes:
