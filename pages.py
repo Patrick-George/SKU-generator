@@ -204,7 +204,16 @@ def home():
             is_text = opts and opts[0].get("type") == "text"
             if is_text:
                 st.markdown(f"<p class='config-label'>{f}</p>", unsafe_allow_html=True)
-                st.text_input(f, help=f"Enter {f}", placeholder=f"Enter {f}", label_visibility="collapsed")
+                txt_val = st.text_input(
+                    f,
+                    key=f"textfield_{cat}_{f}",
+                    help=f"Enter {f}",
+                    placeholder=f"Enter {f}",
+                    label_visibility="collapsed",
+                )
+                if txt_val and txt_val.strip():
+                    clean = txt_val.strip()
+                    sel[f] = {"code": "", "name": clean, "tally_name": "", "description": clean, "is_text": True}
             else:
                 filtered_opts = filter_for_machine(opts, selected_machine_code) if selected_machine_code else opts
                 if filtered_opts:
@@ -1132,14 +1141,25 @@ def _render_history_entry_detail(entry, inventory):
         for field_name, field_val in config.items():
             code = field_val.get("code", "")
             name = field_val.get("name", "")
-            st.markdown(
-                f"<div style='display:flex;gap:10px;align-items:center;padding:4px 0;font-size:13px;'>"
-                f"<span style='min-width:120px;color:#888;font-weight:600;'>{html.escape(field_name)}</span>"
-                f"<span style='background:#eef2f7;color:#3366aa;padding:2px 8px;border-radius:4px;font-family:monospace;font-size:12px;'>{html.escape(str(code))}</span>"
-                f"<span style='color:#444;'>{html.escape(name)}</span>"
-                f"</div>",
-                unsafe_allow_html=True,
-            )
+            is_text = field_val.get("is_text") or (not code and name)
+            if is_text:
+                st.markdown(
+                    f"<div style='padding:4px 0;font-size:13px;'>"
+                    f"<span style='color:#888;font-weight:600;'>{html.escape(field_name)}</span>"
+                    f"<div style='margin-top:3px;color:#444;white-space:pre-wrap;background:#f8f9fb;"
+                    f"border:1px solid #e8eaed;border-radius:6px;padding:8px 12px;'>{html.escape(name)}</div>"
+                    f"</div>",
+                    unsafe_allow_html=True,
+                )
+            else:
+                st.markdown(
+                    f"<div style='display:flex;gap:10px;align-items:center;padding:4px 0;font-size:13px;'>"
+                    f"<span style='min-width:120px;color:#888;font-weight:600;'>{html.escape(field_name)}</span>"
+                    f"<span style='background:#eef2f7;color:#3366aa;padding:2px 8px;border-radius:4px;font-family:monospace;font-size:12px;'>{html.escape(str(code))}</span>"
+                    f"<span style='color:#444;'>{html.escape(name)}</span>"
+                    f"</div>",
+                    unsafe_allow_html=True,
+                )
 
     if extras:
         st.markdown("**Extras**")
