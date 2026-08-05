@@ -510,6 +510,9 @@ def home():
 
                 sku_description = mapped_desc or " - ".join([item['name'] for item in all_breakdown_items])
                 if st.button("💾 Save to History", key="save_history", use_container_width=False):
+                    # Captured before saving: if set, this exact configuration
+                    # was already saved and already owns a short code.
+                    already_had_code = existing_short_code
                     machine_name = sel.get(mf_name, {}).get("name") if mf_name and sel.get(mf_name) else None
                     add_to_sku_history(
                         sku,
@@ -529,8 +532,16 @@ def home():
                         config_signature,
                         st.session_state.get("sku_data", {}).get("short_codes", {}),
                     )
-                    st.toast(f"Saved: {sku}" + (f"  •  {saved_code}" if saved_code else ""))
-                    st.rerun()
+                    if already_had_code:
+                        # Idempotent: no new code was minted. Tell the user which
+                        # existing code this combination already maps to.
+                        st.warning(
+                            f"⚠️ This exact configuration already has a short code: "
+                            f"**{already_had_code}**. Reusing it — no new code was created."
+                        )
+                    else:
+                        st.toast(f"Saved: {sku}" + (f"  •  {saved_code}" if saved_code else ""))
+                        st.rerun()
 
             else:
                 st.info("Select configuration to generate SKU")
