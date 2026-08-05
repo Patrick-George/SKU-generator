@@ -589,6 +589,94 @@ def group_sku_history(history, inventory):
     return grouped
 
 
+def compute_config_signature(category, sel, ordered_field_names, chosen):
+    """
+    Build a canonical, stable signature string for a configuration so that
+    identical configurations always resolve to the same short code.
+
+    Includes every selected field (dropdown codes and free-text values) in
+    field order, plus the sorted set of extra codes. Text values are included
+    because two otherwise-identical machines with different client/version text
+    are genuinely different products and deserve distinct short codes.
+    """
+    parts = [category or ""]
+    for k in ordered_field_names:
+        s = sel.get(k)
+        if not s:
+            continue
+        if s.get("is_text"):
+            val = (s.get("name") or "").strip()
+            if val:
+                parts.append(f"{k}=T:{val}")
+        elif s.get("code"):
+            parts.append(f"{k}={s['code']}")
+    extra_codes = sorted([c.get("code", "") for c in (chosen or []) if c.get("code")])
+    if extra_codes:
+        parts.append("X=" + ",".join(extra_codes))
+    return "|".join(parts)
+
+
+def get_short_code_prefix(category, sel, machine_field_name):
+    """
+    Determine the readable prefix for a short code.
+
+    Uses the selected machine option's code (e.g. 'BL', 'CBM', 'AR', 'HP').
+    Falls back to the category's initials when no machine code is available.
+    """
+    s = sel.get(machine_field_name) if machine_field_name else None
+    if s and s.get("code"):
+        return str(s["code"]).upper()
+    letters = "".join(ch for ch in (category or "") if ch.isalnum())
+    return (letters[:3] or "SKU").upper()
+
+
+def lookup_short_code(signature, short_codes):
+    """Return the existing short code for a signature, or None. Read-only."""
+    if not signature or not short_codes:
+        return None
+    rec = short_codes.get(signature)
+    return rec.get("code") if rec else None
+
+
+def allocate_short_code(signature, prefix, meta):
+    """
+    Return the short code for `signature`, allocating a new one if needed.
+
+    Idempotent: an already-registered signature returns its existing code and
+    does not consume a new number. New signatures get `PREFIX-<n>` where n is a
+    per-prefix running counter. Persists the registry to disk and returns
+    (code, short_codes, code_counters).
+    """
+    from storage import GithubStorage
+
+    storage = GithubStorage()
+    data = storage.load()
+    short_codes = data.get("short_codes", {})
+    counters = data.get("code_counters", {})
+
+    existing = short_codes.get(signature)
+    if existing and existing.get("code"):
+        return existing["code"], short_codes, counters
+
+    seq = int(counters.get(prefix, 0)) + 1
+    counters[prefix] = seq
+    code = f"{prefix}-{seq}"
+
+    record = {
+        "code": code,
+        "prefix": prefix,
+        "seq": seq,
+        "signature": signature,
+        "created_at": now_ist().strftime("%d/%m/%Y %H:%M"),
+    }
+    record.update(meta or {})
+    record["code"] = code  # meta must never override the allocated code
+    short_codes[signature] = record
+
+    storage.save_registry(short_codes, counters)
+    return code, short_codes, counters
+
+
 def add_to_sku_history(
     sku,
     description,
@@ -599,20 +687,50 @@ def add_to_sku_history(
     machine_code=None,
     machine_name=None,
     mapped_name=None,
+    mapped_desc=None,
     breakdown_items=None,
+    signature=None,
+    prefix=None,
 ):
-    """Add a SKU to history (avoid duplicates, limit size). Persists to disk."""
+    """Add a SKU to history (avoid duplicates, limit size). Persists to disk.
+
+    When `signature` and `prefix` are provided, also allocates (or reuses) a
+    short code for the configuration and stores it on the history entry.
+    """
     if not sku:
         return
 
     from storage import GithubStorage
 
     storage = GithubStorage()
+
+    short_code = None
+    if signature and prefix:
+        short_code, short_codes, counters = allocate_short_code(
+            signature,
+            prefix,
+            {
+                "category": category,
+                "sku": sku,
+                "config": config or {},
+                "extras": extras or [],
+                "machine_code": machine_code,
+                "machine_name": machine_name,
+                "mapped_name": mapped_name,
+                "mapped_desc": mapped_desc if mapped_desc is not None else description,
+                "breakdown_items": breakdown_items or [],
+            },
+        )
+        if "sku_data" in st.session_state:
+            st.session_state["sku_data"]["short_codes"] = short_codes
+            st.session_state["sku_data"]["code_counters"] = counters
+
     data = storage.load()
     history = data.get("sku_history", [])
 
     entry = {
         "sku": sku,
+        "short_code": short_code,
         "description": description,
         "category": category,
         "timestamp": now_ist().strftime("%d/%m/%Y %H:%M"),

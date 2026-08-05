@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import json
 import os
+import io
 import html
 from streamlit_sortables import sort_items
 
@@ -20,6 +21,9 @@ from helpers import (
     generate_full_matrix,
     generate_mapped_name_and_description,
     add_to_sku_history,
+    compute_config_signature,
+    get_short_code_prefix,
+    lookup_short_code,
     HISTORY_CATEGORY_ORDER,
     group_sku_history,
     format_history_timestamp,
@@ -342,6 +346,15 @@ def home():
                 escaped_name = mapped_name.replace("'", "\\'").replace("`", "") if mapped_name else ""
                 escaped_desc = mapped_desc.replace("'", "\\'").replace("`", "") if mapped_desc else ""
 
+                # Short code: read-only lookup against the saved registry. A code
+                # is only *allocated* on Save; here we just show the existing one
+                # (if this exact configuration was saved before) or a hint.
+                config_signature = compute_config_signature(cat, sel, ordered_fields(fields), chosen)
+                short_code_prefix = get_short_code_prefix(cat, sel, mf_name)
+                existing_short_code = lookup_short_code(
+                    config_signature, st.session_state.get("sku_data", {}).get("short_codes", {})
+                )
+
                 sq = "\x27"  # single quote for use inside f-string expressions
                 name_card_html = (
                     '<div class="copy-card name-card" onclick="copyText('
@@ -358,6 +371,22 @@ def home():
                     + '</div><div class="copy-btn"><span id="desc-icon" class="material-symbols-outlined">content_copy</span>'
                     + '<p id="desc-label">Click to Copy</p></div></div>'
                 ) if mapped_desc else '<div style="color: #bbb; font-size: 13px; font-style: italic; padding: 8px 0;">Set Description mappings in Settings</div>'
+
+                if existing_short_code:
+                    short_code_html = (
+                        '<div class="copy-card code-card" onclick="copyText('
+                        + sq + existing_short_code + sq + ", " + sq + "code" + sq
+                        + ')"><div class="text">' + existing_short_code
+                        + '</div><div class="copy-btn"><span id="code-icon" class="material-symbols-outlined">content_copy</span>'
+                        + '<p id="code-label">Click to Copy</p></div></div>'
+                    )
+                else:
+                    short_code_html = (
+                        '<div style="background:#fbf6ff;border:1.5px dashed #d9c7ee;border-radius:10px;'
+                        'padding:12px 16px;color:#7a5aa6;font-size:13px;font-style:italic;">'
+                        'Assigned when you Save to History'
+                        '</div>'
+                    )
 
                 breakdown_html = "".join(
                     '<div class="breakdown-row"><span class="breakdown-code">'
@@ -393,6 +422,10 @@ def home():
                     .sku-card .text {{ font-size: 18px; font-weight: 700; color: #1a5ed1; letter-spacing: 0.5px; }}
                     .sku-card .copy-btn {{ color: #1a5ed1; }}
                     .sku-card .copy-btn p {{ color: #7aabf0; }}
+                    .code-card {{ background: #fbf6ff; border: 1.5px solid #e2d3f5; }}
+                    .code-card .text {{ font-size: 17px; font-weight: 700; color: #7a3ecb; letter-spacing: 0.5px; }}
+                    .code-card .copy-btn {{ color: #7a3ecb; }}
+                    .code-card .copy-btn p {{ color: #b08fe0; }}
                     .name-card {{ background: #f0faf2; border: 1.5px solid #c8e6cc; }}
                     .name-card .text {{ font-size: 15px; font-weight: 600; color: #1b6e2a; }}
                     .name-card .copy-btn {{ color: #1b6e2a; }}
@@ -424,6 +457,12 @@ def home():
                                 <p id="sku-label">Click to Copy</p>
                             </div>
                         </div>
+                    </div>
+
+                    <!-- Short Code -->
+                    <div>
+                        <div class="section-label">Short Code</div>
+                        {short_code_html}
                     </div>
 
                     {'<!-- Item Name --><div><div class="section-label">Item Name</div>' + name_card_html + '</div>' if cat != "Blast Machine" else ''}
@@ -460,7 +499,7 @@ def home():
                 """
 
                 total_items = len(all_breakdown_items)
-                card_height = 320 + (total_items * 30)
+                card_height = 320 + (total_items * 30) + 90
                 if cat == "Blast Machine":
                     card_height -= 88
                 if mapped_desc and len(mapped_desc) > 80:
@@ -481,9 +520,16 @@ def home():
                         machine_code=selected_machine_code,
                         machine_name=machine_name,
                         mapped_name=mapped_name,
+                        mapped_desc=mapped_desc,
                         breakdown_items=all_breakdown_items,
+                        signature=config_signature,
+                        prefix=short_code_prefix,
                     )
-                    st.toast(f"Saved: {sku}")
+                    saved_code = lookup_short_code(
+                        config_signature,
+                        st.session_state.get("sku_data", {}).get("short_codes", {}),
+                    )
+                    st.toast(f"Saved: {sku}" + (f"  •  {saved_code}" if saved_code else ""))
                     st.rerun()
 
             else:
@@ -1160,6 +1206,17 @@ def _render_history_entry_detail(entry, inventory):
     """
     st.markdown(copy_html, unsafe_allow_html=True)
 
+    short_code = entry.get("short_code")
+    if short_code:
+        st.markdown(
+            f"<div style='display:inline-block;background:#fbf6ff;border:1.5px solid #e2d3f5;"
+            f"border-radius:8px;padding:8px 14px;margin-bottom:12px;'>"
+            f"<span style='color:#888;font-weight:600;font-size:13px;'>Short Code</span> "
+            f"<span style='color:#7a3ecb;font-weight:700;font-size:16px;'>{html.escape(str(short_code))}</span>"
+            f"</div>",
+            unsafe_allow_html=True,
+        )
+
     date_str, time_str = format_history_timestamp(entry.get("timestamp"))
     if date_str or time_str:
         st.markdown(
@@ -1299,6 +1356,35 @@ def _render_history_skus(cat, machine, grouped, inventory):
             _render_history_entry_detail(entry, inventory)
 
 
+def _build_codes_excel(registry):
+    """Build an .xlsx (bytes) of all saved short codes from the registry."""
+    rows = []
+    for rec in registry.values():
+        rows.append({
+            "Short Code": rec.get("code", ""),
+            "SKU": rec.get("sku", ""),
+            "Category": rec.get("category", ""),
+            "Item Name": rec.get("mapped_name", "") or "",
+            "Description": rec.get("mapped_desc", "") or rec.get("description", "") or "",
+            "Created At": rec.get("created_at", ""),
+        })
+
+    df = pd.DataFrame(rows, columns=[
+        "Short Code", "SKU", "Category", "Item Name", "Description", "Created At",
+    ])
+    # Sort by prefix then numeric sequence so codes read naturally (BL-1, BL-2, ...).
+    if not df.empty:
+        parts = df["Short Code"].astype(str).str.rsplit("-", n=1, expand=True)
+        df["_prefix"] = parts[0]
+        df["_seq"] = pd.to_numeric(parts[1], errors="coerce") if parts.shape[1] > 1 else 0
+        df = df.sort_values(["_prefix", "_seq"]).drop(columns=["_prefix", "_seq"])
+
+    buffer = io.BytesIO()
+    with pd.ExcelWriter(buffer, engine="openpyxl") as writer:
+        df.to_excel(writer, index=False, sheet_name="Saved Codes")
+    return buffer.getvalue()
+
+
 def history_page():
     """SKU History page with category → machine → SKU drill-down."""
     with st.sidebar:
@@ -1338,6 +1424,19 @@ def history_page():
     inventory = st.session_state.get("sku_data", {}).get("inventory", {})
     grouped = group_sku_history(history, inventory)
 
+    registry = st.session_state.get("sku_data", {}).get("short_codes", {})
+    if registry:
+        excel_bytes = _build_codes_excel(registry)
+        dl_col1, dl_col2, dl_col3 = st.columns([1, 2, 1])
+        with dl_col2:
+            st.download_button(
+                f"⬇️ Download Saved Codes ({len(registry)}) as Excel",
+                data=excel_bytes,
+                file_name="blastline_saved_codes.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                use_container_width=True,
+            )
+
     if not history:
         st.markdown("---")
         st.info("📭 No SKU history yet. Generate some SKUs and click **Save to History** to see them here!")
@@ -1369,6 +1468,71 @@ def history_page():
 # ==================================================
 # DECODER PAGE
 # ==================================================
+def _find_registry_by_code(registry, text):
+    """Return the saved short-code record matching `text` (case-insensitive), or None."""
+    if not registry or not text:
+        return None
+    t = str(text).strip().upper()
+    for rec in registry.values():
+        if str(rec.get("code", "")).strip().upper() == t:
+            return rec
+    return None
+
+
+def _find_code_for_sku(registry, sku):
+    """Return the short code assigned to a full SKU string, or None."""
+    if not registry or not sku:
+        return None
+    s = str(sku).strip().upper()
+    for rec in registry.values():
+        if str(rec.get("sku", "")).strip().upper() == s:
+            return rec.get("code")
+    return None
+
+
+def _render_short_code_result(rec):
+    """Render a decoded short-code record using its stored snapshot."""
+    st.success(f"✅ **Short Code:** {rec.get('code', '')}  —  {rec.get('category', '')}")
+
+    full_sku = rec.get("sku", "")
+    if full_sku:
+        st.markdown("**Full SKU**")
+        st.markdown(
+            f'<div style="background:#f0f6ff;border:1.5px solid #d0e3ff;border-radius:8px;'
+            f'padding:12px 16px;font-weight:700;color:#1a5ed1;">{html.escape(full_sku)}</div>',
+            unsafe_allow_html=True,
+        )
+
+    item_name = rec.get("mapped_name")
+    item_desc = rec.get("mapped_desc") or rec.get("description")
+    if item_name:
+        st.markdown("**Item Name**")
+        st.markdown(
+            f'<div style="background:#f0faf2;border:1.5px solid #c8e6cc;border-radius:8px;'
+            f'padding:12px 16px;font-weight:600;color:#1b6e2a;">{html.escape(item_name)}</div>',
+            unsafe_allow_html=True,
+        )
+    if item_desc:
+        st.markdown("**Item Description**")
+        st.markdown(
+            f'<div style="background:#faf8f0;border:1.5px solid #e6dfc8;border-radius:8px;'
+            f'padding:12px 16px;color:#5a4e2b;">{html.escape(item_desc)}</div>',
+            unsafe_allow_html=True,
+        )
+
+    breakdown = rec.get("breakdown_items") or []
+    if breakdown:
+        st.markdown("#### Component Breakdown:")
+        for part in breakdown:
+            c1, c2, c3 = st.columns([1, 1, 2])
+            with c1:
+                st.markdown(f"**{part.get('field', '')}**")
+            with c2:
+                st.code(part.get("code", ""))
+            with c3:
+                st.markdown(part.get("name", ""))
+
+
 def decoder_page():
     """SKU Decoder page."""
     with st.sidebar:
@@ -1399,11 +1563,24 @@ def decoder_page():
         st.markdown(f"### Decoding: `{decode_input}`")
 
         inv = st.session_state["sku_data"]["inventory"]
+        registry = st.session_state.get("sku_data", {}).get("short_codes", {})
+
+        # A short code (e.g. "CBM-12") is resolved by a direct registry lookup,
+        # not by the character-parsing decoder.
+        code_rec = _find_registry_by_code(registry, decode_input)
+        if code_rec:
+            _render_short_code_result(code_rec)
+            return
+
         results = decode_sku(decode_input, inv)
 
         if results:
             best = results[0]
             st.success(f"✅ **Category Matched:** {best['category']}")
+
+            matched_code = _find_code_for_sku(registry, decode_input)
+            if matched_code:
+                st.info(f"🔖 Short Code: **{matched_code}**")
 
             cat_data = inv[best["category"]]
             sel, field_order, chosen, fittings_selected = build_selection_from_decode(best, cat_data)

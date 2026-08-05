@@ -44,6 +44,11 @@ class GithubStorage:
 
         data.setdefault("inventory", {})
         data.setdefault("sku_history", [])
+        # Registry of permanently allocated short codes.
+        #   short_codes:   signature -> record ({code, prefix, seq, sku, ...})
+        #   code_counters: prefix    -> last allocated sequence number
+        data.setdefault("short_codes", {})
+        data.setdefault("code_counters", {})
         return data
 
     def save(self, data):
@@ -64,6 +69,19 @@ class GithubStorage:
         try:
             current = self.load()
             current["sku_history"] = history
+            return self.save(current)
+        except Exception:
+            return False
+
+    def save_registry(self, short_codes, code_counters):
+        """
+        Persist just the short-code registry without touching inventory or
+        history. Read-modify-write so concurrent edits aren't clobbered.
+        """
+        try:
+            current = self.load()
+            current["short_codes"] = short_codes
+            current["code_counters"] = code_counters
             return self.save(current)
         except Exception:
             return False
