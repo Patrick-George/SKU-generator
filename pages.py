@@ -1383,32 +1383,28 @@ def _render_history_list(entries, inventory, group_by):
                 _render_history_entry_detail(entry, inventory)
 
 
-def _build_codes_excel(registry):
-    """Build an .xlsx (bytes) of all saved short codes from the registry."""
+def _build_history_excel(entries):
+    """Build a minimal .xlsx of history rows: Short Code, SKU, Name/Description."""
     rows = []
-    for rec in registry.values():
+    for entry in entries:
+        name = (entry.get("mapped_name") or "").strip()
+        desc = (entry.get("description") or "").strip()
         rows.append({
-            "Short Code": rec.get("code", ""),
-            "SKU": rec.get("sku", ""),
-            "Category": rec.get("category", ""),
-            "Item Name": rec.get("mapped_name", "") or "",
-            "Description": rec.get("mapped_desc", "") or rec.get("description", "") or "",
-            "Created At": rec.get("created_at", ""),
+            "Short Code": entry.get("short_code") or "",
+            "SKU": entry.get("sku") or "",
+            "Name / Description": name or desc,
         })
 
-    df = pd.DataFrame(rows, columns=[
-        "Short Code", "SKU", "Category", "Item Name", "Description", "Created At",
-    ])
-    # Sort by prefix then numeric sequence so codes read naturally (BL-1, BL-2, ...).
+    df = pd.DataFrame(rows, columns=["Short Code", "SKU", "Name / Description"])
     if not df.empty:
         parts = df["Short Code"].astype(str).str.rsplit("-", n=1, expand=True)
         df["_prefix"] = parts[0]
         df["_seq"] = pd.to_numeric(parts[1], errors="coerce") if parts.shape[1] > 1 else 0
-        df = df.sort_values(["_prefix", "_seq"]).drop(columns=["_prefix", "_seq"])
+        df = df.sort_values(["_prefix", "_seq"], na_position="last").drop(columns=["_prefix", "_seq"])
 
     buffer = io.BytesIO()
     with pd.ExcelWriter(buffer, engine="openpyxl") as writer:
-        df.to_excel(writer, index=False, sheet_name="Saved Codes")
+        df.to_excel(writer, index=False, sheet_name="SKU History")
     return buffer.getvalue()
 
 
@@ -1431,29 +1427,6 @@ def history_page():
 
     history = st.session_state.get("sku_history", [])
     inventory = st.session_state.get("sku_data", {}).get("inventory", {})
-    registry = st.session_state.get("sku_data", {}).get("short_codes", {})
-
-    # Toolbar: equal-weight actions
-    tool_l, tool_r = st.columns(2, gap="small")
-    with tool_l:
-        if registry:
-            excel_bytes = _build_codes_excel(registry)
-            st.download_button(
-                f"⬇️ Download Excel ({len(registry)})",
-                data=excel_bytes,
-                file_name="blastline_saved_codes.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                use_container_width=True,
-            )
-    with tool_r:
-        if history and st.button("🗑️ Clear All History", type="secondary", use_container_width=True):
-            GithubStorage().save_history([])
-            st.session_state["sku_history"] = []
-            if "sku_data" in st.session_state:
-                st.session_state["sku_data"]["sku_history"] = []
-            st.session_state.pop("history_cat", None)
-            st.session_state.pop("history_machine", None)
-            st.rerun()
 
     if not history:
         st.markdown("---")
@@ -1461,8 +1434,6 @@ def history_page():
         if st.button("🏠 Go to SKU Generator"):
             go("home")
         return
-
-    st.markdown("---")
 
     filter_options = _history_filter_options(history)
     filter_labels = [label for label, _key in filter_options]
@@ -1492,8 +1463,28 @@ def history_page():
 
     filter_key = label_to_key.get(filter_label, "all")
     group_by = {"Recent": "recent", "Client": "client", "Machine": "machine"}[group_label]
-
     filtered = filter_sku_history(history, inventory, query=query, filter_key=filter_key)
+
+    tool_l, tool_r = st.columns(2, gap="small")
+    with tool_l:
+        if filtered:
+            excel_bytes = _build_history_excel(filtered)
+            st.download_button(
+                f"⬇️ Download Excel ({len(filtered)})",
+                data=excel_bytes,
+                file_name="blastline_sku_history.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                use_container_width=True,
+            )
+    with tool_r:
+        if st.button("🗑️ Clear All History", type="secondary", use_container_width=True):
+            GithubStorage().save_history([])
+            st.session_state["sku_history"] = []
+            if "sku_data" in st.session_state:
+                st.session_state["sku_data"]["sku_history"] = []
+            st.session_state.pop("history_cat", None)
+            st.session_state.pop("history_machine", None)
+            st.rerun()
 
     cbm_count = sum(1 for e in history if is_custom_blast_machine(e, inventory))
     st.caption(
