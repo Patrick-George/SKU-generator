@@ -1433,20 +1433,20 @@ def history_page():
     inventory = st.session_state.get("sku_data", {}).get("inventory", {})
     registry = st.session_state.get("sku_data", {}).get("short_codes", {})
 
-    # Toolbar: download + clear
-    tool_l, tool_r = st.columns([3, 1])
+    # Toolbar: equal-weight actions
+    tool_l, tool_r = st.columns(2, gap="small")
     with tool_l:
         if registry:
             excel_bytes = _build_codes_excel(registry)
             st.download_button(
-                f"⬇️ Download Saved Codes ({len(registry)}) as Excel",
+                f"⬇️ Download Excel ({len(registry)})",
                 data=excel_bytes,
                 file_name="blastline_saved_codes.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 use_container_width=True,
             )
     with tool_r:
-        if history and st.button("🗑️ Clear All", type="secondary", use_container_width=True):
+        if history and st.button("🗑️ Clear All History", type="secondary", use_container_width=True):
             GithubStorage().save_history([])
             st.session_state["sku_history"] = []
             if "sku_data" in st.session_state:
@@ -1468,12 +1468,11 @@ def history_page():
     filter_labels = [label for label, _key in filter_options]
     label_to_key = {label: key for label, key in filter_options}
 
-    search_col, filter_col, group_col = st.columns([3, 2, 2])
+    search_col, filter_col, group_col = st.columns([2, 1, 1], gap="small")
     with search_col:
         query = st.text_input(
             "Search",
             placeholder="Client, abbr, short code, SKU, machine…",
-            label_visibility="collapsed",
             key="history_search",
         )
     with filter_col:
