@@ -589,6 +589,229 @@ def group_sku_history(history, inventory):
     return grouped
 
 
+def _config_field_text(config, *name_parts, exclude=()):
+    """Return the display text for the first config field whose name matches all parts."""
+    if not config:
+        return ""
+    lowered_parts = [p.lower() for p in name_parts]
+    exclude_l = [e.lower() for e in exclude]
+    for key, val in config.items():
+        key_l = str(key).lower()
+        if exclude_l and any(e in key_l for e in exclude_l):
+            continue
+        if all(p in key_l for p in lowered_parts):
+            return (val.get("name") or val.get("code") or "").strip()
+    return ""
+
+
+def get_history_client_info(entry):
+    """Return (client_name, client_abbr) from a history entry's config when present."""
+    config = entry.get("config") or {}
+    name = _config_field_text(config, "client", "name", exclude=("abbrev",))
+    if not name:
+        # Free-text client field without "name" in the label
+        name = _config_field_text(config, "client", exclude=("abbrev",))
+
+    abbr = ""
+    for key, val in (config or {}).items():
+        key_l = str(key).lower()
+        if "abbrev" not in key_l:
+            continue
+        # Abbreviation is usually the code token (NB); name may repeat the client.
+        abbr = (val.get("code") or val.get("name") or "").strip()
+        if abbr:
+            break
+    return name, abbr
+
+
+def is_custom_blast_machine(entry, inventory=None):
+    """True when the entry is a Customized Blast Machine (CBM)."""
+    mcode = (entry.get("machine_code") or "").upper()
+    if mcode == "CBM":
+        return True
+    mname = (entry.get("machine_name") or "").lower()
+    if "custom" in mname and "blast" in mname:
+        return True
+    if inventory is not None:
+        code, name = get_history_machine_key(entry, inventory)
+        if str(code).upper() == "CBM":
+            return True
+        name_l = str(name).lower()
+        if "custom" in name_l and "blast" in name_l:
+            return True
+    return False
+
+
+def get_history_identity(entry, inventory):
+    """
+    Human identity label for list rows.
+    CBM: client name (+ abbr). Others: machine code — machine name.
+    """
+    client_name, client_abbr = get_history_client_info(entry)
+    if is_custom_blast_machine(entry, inventory) and (client_name or client_abbr):
+        if client_name and client_abbr:
+            return f"{client_name} ({client_abbr})"
+        return client_name or client_abbr
+
+    mcode, mname = get_history_machine_key(entry, inventory)
+    if mcode and mname and mcode != mname and mcode != "—":
+        return f"{mcode} — {mname}"
+    return mname or mcode or "Unknown"
+
+
+def get_history_specs_summary(entry, max_parts=3):
+    """Short scannable specs line from config (capacity, config, cert, etc.)."""
+    config = entry.get("config") or {}
+    if not config:
+        desc = (entry.get("description") or entry.get("mapped_name") or "").strip()
+        if len(desc) > 60:
+            return desc[:57] + "…"
+        return desc
+
+    preferred = (
+        "capacity",
+        "configuration",
+        "certification",
+        "valve",
+        "screen",
+        "fittings",
+    )
+    skip = ("machine", "client", "version", "customization", "other")
+    parts = []
+    used_keys = set()
+
+    for pref in preferred:
+        for key, val in config.items():
+            key_l = str(key).lower()
+            if key in used_keys:
+                continue
+            if pref not in key_l:
+                continue
+            if any(s in key_l for s in ("client", "machine")):
+                continue
+            label = (val.get("name") or val.get("code") or "").strip()
+            if label:
+                parts.append(label)
+                used_keys.add(key)
+                break
+        if len(parts) >= max_parts:
+            break
+
+    if len(parts) < max_parts:
+        for key, val in config.items():
+            if key in used_keys:
+                continue
+            key_l = str(key).lower()
+            if any(s in key_l for s in skip):
+                continue
+            if val.get("is_text"):
+                continue
+            label = (val.get("name") or val.get("code") or "").strip()
+            if label:
+                parts.append(label)
+                used_keys.add(key)
+            if len(parts) >= max_parts:
+                break
+
+    return " · ".join(parts)
+
+
+def history_entry_matches_query(entry, inventory, query):
+    """True if query matches SKU, short code, client, machine, category, or description."""
+    q = (query or "").strip().lower()
+    if not q:
+        return True
+
+    client_name, client_abbr = get_history_client_info(entry)
+    mcode, mname = get_history_machine_key(entry, inventory)
+    haystacks = [
+        entry.get("sku") or "",
+        entry.get("short_code") or "",
+        entry.get("category") or "",
+        entry.get("description") or "",
+        entry.get("mapped_name") or "",
+        client_name,
+        client_abbr,
+        mcode,
+        mname,
+        get_history_identity(entry, inventory),
+        get_history_specs_summary(entry),
+    ]
+    return any(q in str(h).lower() for h in haystacks if h)
+
+
+def filter_sku_history(history, inventory, query="", filter_key="all"):
+    """
+    Filter history for the searchable list view.
+    filter_key: 'all' | 'cbm' | category name
+    """
+    results = []
+    for entry in history:
+        cat = entry.get("category") or "Other"
+        if filter_key == "cbm":
+            if not is_custom_blast_machine(entry, inventory):
+                continue
+        elif filter_key not in ("", "all", None):
+            if cat != filter_key:
+                continue
+        if not history_entry_matches_query(entry, inventory, query):
+            continue
+        results.append(entry)
+    return results
+
+
+def group_history_for_display(entries, inventory, group_by="recent"):
+    """
+    Return ordered list of (section_title, [entries]) for the history UI.
+    group_by: 'recent' | 'client' | 'machine'
+    """
+    if not entries:
+        return []
+
+    if group_by == "recent":
+        return [("Recent", list(entries))]
+
+    buckets = {}
+    order = []
+
+    for entry in entries:
+        if group_by == "client":
+            client_name, client_abbr = get_history_client_info(entry)
+            if is_custom_blast_machine(entry, inventory) and (client_name or client_abbr):
+                if client_name and client_abbr:
+                    key = f"{client_name} ({client_abbr})"
+                else:
+                    key = client_name or client_abbr
+            elif is_custom_blast_machine(entry, inventory):
+                key = "Custom (no client)"
+            else:
+                mcode, mname = get_history_machine_key(entry, inventory)
+                key = f"{mcode} — {mname}" if mcode != "—" else (mname or "Other")
+        else:  # machine
+            mcode, mname = get_history_machine_key(entry, inventory)
+            key = f"{mcode} — {mname}" if mcode and mcode != "—" else (mname or "Unknown")
+
+        if key not in buckets:
+            buckets[key] = []
+            order.append(key)
+        buckets[key].append(entry)
+
+    if group_by == "client":
+        def sort_key(title):
+            sample = buckets[title][0] if buckets[title] else {}
+            if is_custom_blast_machine(sample, inventory):
+                if title == "Custom (no client)":
+                    return (1, title.lower())
+                return (0, title.lower())
+            return (2, title.lower())
+
+        order = sorted(order, key=sort_key)
+    else:
+        order = sorted(order, key=lambda t: (t.startswith("—"), t.lower()))
+
+    return [(title, buckets[title]) for title in order]
+
+
 def compute_config_signature(category, sel, ordered_field_names, chosen):
     """
     Build a canonical, stable signature string for a configuration so that

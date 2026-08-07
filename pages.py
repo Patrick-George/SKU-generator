@@ -25,8 +25,13 @@ from helpers import (
     get_short_code_prefix,
     lookup_short_code,
     HISTORY_CATEGORY_ORDER,
-    group_sku_history,
     format_history_timestamp,
+    get_history_client_info,
+    get_history_identity,
+    get_history_specs_summary,
+    is_custom_blast_machine,
+    filter_sku_history,
+    group_history_for_display,
     decode_sku,
     build_selection_from_decode,
     render_sidebar_nav,
@@ -1219,11 +1224,34 @@ def _render_history_entry_detail(entry, inventory):
 
     short_code = entry.get("short_code")
     if short_code:
+        sc_escaped = html.escape(str(short_code))
         st.markdown(
+            f"<div style='display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:12px;'>"
             f"<div style='display:inline-block;background:#fbf6ff;border:1.5px solid #e2d3f5;"
-            f"border-radius:8px;padding:8px 14px;margin-bottom:12px;'>"
+            f"border-radius:8px;padding:8px 14px;'>"
             f"<span style='color:#888;font-weight:600;font-size:13px;'>Short Code</span> "
-            f"<span style='color:#7a3ecb;font-weight:700;font-size:16px;'>{html.escape(str(short_code))}</span>"
+            f"<span style='color:#7a3ecb;font-weight:700;font-size:16px;'>{sc_escaped}</span>"
+            f"</div>"
+            f"<button onclick=\"navigator.clipboard.writeText('{sc_escaped}'); this.innerText='✓ Copied'\""
+            f" style='background:#fbf6ff;border:1px solid #c4a8e8;border-radius:6px;"
+            f"padding:7px 12px;cursor:pointer;color:#7a3ecb;font-size:14px;'>"
+            f"Copy Short Code</button>"
+            f"</div>",
+            unsafe_allow_html=True,
+        )
+
+    client_name, client_abbr = get_history_client_info(entry)
+    if client_name or client_abbr:
+        client_label = client_name or ""
+        if client_name and client_abbr:
+            client_label = f"{client_name} ({client_abbr})"
+        elif client_abbr:
+            client_label = client_abbr
+        st.markdown(
+            f"<div style='background:#eef6ff;border:1px solid #c5daf5;border-radius:8px;"
+            f"padding:10px 14px;margin-bottom:12px;'>"
+            f"<span style='color:#5a7aa0;font-weight:600;font-size:13px;'>Client</span>"
+            f"<div style='color:#1a4a7a;font-weight:700;font-size:17px;'>{html.escape(client_label)}</div>"
             f"</div>",
             unsafe_allow_html=True,
         )
@@ -1301,70 +1329,58 @@ def _render_history_entry_detail(entry, inventory):
         st.caption("Configuration snapshot not available for this entry.")
 
 
-def _history_goto(cat=None, machine=None):
-    """Set history drill-down navigation state and rerun."""
-    st.session_state["history_cat"] = cat
-    st.session_state["history_machine"] = machine
-    st.rerun()
+def _history_row_label(entry, inventory):
+    """Dense one-line expander label: identity · short · sku · specs · date."""
+    identity = get_history_identity(entry, inventory)
+    short_code = entry.get("short_code") or "—"
+    sku = entry.get("sku") or ""
+    sku_short = sku if len(sku) <= 28 else sku[:25] + "…"
+    specs = get_history_specs_summary(entry)
+    date_str, _time_str = format_history_timestamp(entry.get("timestamp"))
+
+    parts = [identity, str(short_code), sku_short]
+    if specs:
+        parts.append(specs)
+    if date_str:
+        parts.append(date_str)
+    return "   ·   ".join(parts)
 
 
-def _render_history_categories(grouped, inventory):
-    """Level 0: one button per main category."""
-    st.markdown("<p style='text-align: center; color: #666;'>Select a category</p>", unsafe_allow_html=True)
-    st.markdown("---")
-
-    extra_categories = sorted(c for c in grouped if c not in HISTORY_CATEGORY_ORDER)
-    category_order = HISTORY_CATEGORY_ORDER + extra_categories
-
-    for cat in category_order:
-        machine_groups = grouped.get(cat, {})
-        cat_count = sum(len(entries) for entries in machine_groups.values())
-        label = f"{cat}  ·  {cat_count} SKU{'s' if cat_count != 1 else ''}"
-        if st.button(label, key=f"hist_cat_{cat}", use_container_width=True, disabled=cat_count == 0):
-            _history_goto(cat=cat)
+def _history_filter_options(history):
+    """Build (label, key) filter options present in history."""
+    options = [("All", "all"), ("Custom (CBM)", "cbm")]
+    cats_present = {e.get("category") or "Other" for e in history}
+    for cat in HISTORY_CATEGORY_ORDER:
+        if cat in cats_present:
+            options.append((cat, cat))
+    for cat in sorted(cats_present):
+        if cat not in HISTORY_CATEGORY_ORDER:
+            options.append((cat, cat))
+    return options
 
 
-def _render_history_machines(cat, grouped, inventory):
-    """Level 1: one button per machine within a category."""
-    if st.button("← Back to categories", key="hist_back_cats"):
-        _history_goto()
-
-    st.markdown(f"<h3 style='text-align:center;'>{html.escape(cat)}</h3>", unsafe_allow_html=True)
-    st.markdown("<p style='text-align: center; color: #666;'>Select a machine</p>", unsafe_allow_html=True)
-    st.markdown("---")
-
-    machine_groups = grouped.get(cat, {})
-    if not machine_groups:
-        st.markdown("<p class='history-empty-cat'>No SKUs saved yet for this category.</p>", unsafe_allow_html=True)
+def _render_history_list(entries, inventory, group_by):
+    """Render filtered history as dense expandable rows, optionally grouped."""
+    sections = group_history_for_display(entries, inventory, group_by=group_by)
+    if not sections:
+        st.info("No SKUs match your search or filter.")
         return
 
-    for (mcode, mname) in sorted(machine_groups.keys(), key=lambda k: (k[0] == "—", k[0])):
-        entries = machine_groups[(mcode, mname)]
-        label = f"{mcode} — {mname}  ·  {len(entries)} SKU{'s' if len(entries) != 1 else ''}"
-        if st.button(label, key=f"hist_machine_{mcode}_{mname}", use_container_width=True):
-            _history_goto(cat=cat, machine=(mcode, mname))
-
-
-def _render_history_skus(cat, machine, grouped, inventory):
-    """Level 2: list of SKUs for a machine, each expandable to full config."""
-    mcode, mname = machine
-    if st.button("← Back to machines", key="hist_back_machines"):
-        _history_goto(cat=cat)
-
-    st.markdown(f"<h3 style='text-align:center;'>{html.escape(cat)}</h3>", unsafe_allow_html=True)
-    st.markdown(f"<p style='text-align: center; color: #666;'>{html.escape(str(mcode))} — {html.escape(mname)}</p>", unsafe_allow_html=True)
-    st.markdown("---")
-
-    entries = grouped.get(cat, {}).get(machine, [])
-    if not entries:
-        st.markdown("<p class='history-empty-cat'>No SKUs saved for this machine.</p>", unsafe_allow_html=True)
-        return
-
-    for entry in entries:
-        date_str, time_str = format_history_timestamp(entry.get("timestamp"))
-        sku_label = f"{entry['sku']}   —   Date: {date_str}   ·   Time: {time_str}"
-        with st.expander(sku_label, expanded=False):
-            _render_history_entry_detail(entry, inventory)
+    for section_title, section_entries in sections:
+        if group_by != "recent":
+            st.markdown(
+                f"<div style='margin:14px 0 6px 0;font-size:15px;font-weight:700;color:#444;'>"
+                f"{html.escape(section_title)}"
+                f"<span style='color:#888;font-weight:600;font-size:13px;'>"
+                f"  ·  {len(section_entries)} SKU{'s' if len(section_entries) != 1 else ''}"
+                f"</span></div>",
+                unsafe_allow_html=True,
+            )
+        for i, entry in enumerate(section_entries):
+            sku_key = entry.get("sku") or f"row_{i}"
+            label = _history_row_label(entry, inventory)
+            with st.expander(label, expanded=False):
+                _render_history_entry_detail(entry, inventory)
 
 
 def _build_codes_excel(registry):
@@ -1397,34 +1413,16 @@ def _build_codes_excel(registry):
 
 
 def history_page():
-    """SKU History page with category → machine → SKU drill-down."""
+    """SKU History: searchable list with client-first identity for custom machines."""
     with st.sidebar:
         render_sidebar_nav("history")
 
     st.markdown("""
         <style>
-        .history-empty-cat {
-            color: #aaa;
-            font-size: 15px;
-            font-style: italic;
-            margin: 4px 0;
-        }
-        /* Bigger expander (SKU row) label */
         div[data-testid="stExpander"] details summary p {
             font-weight: 600;
-            font-size: 16px !important;
-        }
-        /* Bigger category / machine / back navigation buttons */
-        div[data-testid="stButton"] button p {
-            font-size: 16px !important;
-            font-weight: 600;
-        }
-        /* Bigger section headers inside history */
-        .history-detail-label {
-            font-size: 15px;
-            font-weight: 700;
-            color: #333;
-            margin: 10px 0 4px 0;
+            font-size: 14px !important;
+            line-height: 1.35;
         }
         </style>
     """, unsafe_allow_html=True)
@@ -1433,13 +1431,13 @@ def history_page():
 
     history = st.session_state.get("sku_history", [])
     inventory = st.session_state.get("sku_data", {}).get("inventory", {})
-    grouped = group_sku_history(history, inventory)
-
     registry = st.session_state.get("sku_data", {}).get("short_codes", {})
-    if registry:
-        excel_bytes = _build_codes_excel(registry)
-        dl_col1, dl_col2, dl_col3 = st.columns([1, 2, 1])
-        with dl_col2:
+
+    # Toolbar: download + clear
+    tool_l, tool_r = st.columns([3, 1])
+    with tool_l:
+        if registry:
+            excel_bytes = _build_codes_excel(registry)
             st.download_button(
                 f"⬇️ Download Saved Codes ({len(registry)}) as Excel",
                 data=excel_bytes,
@@ -1447,6 +1445,15 @@ def history_page():
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 use_container_width=True,
             )
+    with tool_r:
+        if history and st.button("🗑️ Clear All", type="secondary", use_container_width=True):
+            GithubStorage().save_history([])
+            st.session_state["sku_history"] = []
+            if "sku_data" in st.session_state:
+                st.session_state["sku_data"]["sku_history"] = []
+            st.session_state.pop("history_cat", None)
+            st.session_state.pop("history_machine", None)
+            st.rerun()
 
     if not history:
         st.markdown("---")
@@ -1455,26 +1462,47 @@ def history_page():
             go("home")
         return
 
-    selected_cat = st.session_state.get("history_cat")
-    selected_machine = st.session_state.get("history_machine")
-
-    if selected_cat and selected_cat in grouped and selected_machine and selected_machine in grouped[selected_cat]:
-        _render_history_skus(selected_cat, selected_machine, grouped, inventory)
-    elif selected_cat:
-        _render_history_machines(selected_cat, grouped, inventory)
-    else:
-        _render_history_categories(grouped, inventory)
-
     st.markdown("---")
-    if st.button("🗑️ Clear All History", type="secondary"):
-        GithubStorage().save_history([])
-        st.session_state["sku_history"] = []
-        if "sku_data" in st.session_state:
-            st.session_state["sku_data"]["sku_history"] = []
-        st.session_state["history_cat"] = None
-        st.session_state["history_machine"] = None
-        st.rerun()
 
+    filter_options = _history_filter_options(history)
+    filter_labels = [label for label, _key in filter_options]
+    label_to_key = {label: key for label, key in filter_options}
+
+    search_col, filter_col, group_col = st.columns([3, 2, 2])
+    with search_col:
+        query = st.text_input(
+            "Search",
+            placeholder="Client, abbr, short code, SKU, machine…",
+            label_visibility="collapsed",
+            key="history_search",
+        )
+    with filter_col:
+        filter_label = st.selectbox(
+            "Filter",
+            filter_labels,
+            index=0,
+            key="history_filter_label",
+        )
+    with group_col:
+        group_label = st.selectbox(
+            "Group by",
+            ["Recent", "Client", "Machine"],
+            index=0,
+            key="history_group_by",
+        )
+
+    filter_key = label_to_key.get(filter_label, "all")
+    group_by = {"Recent": "recent", "Client": "client", "Machine": "machine"}[group_label]
+
+    filtered = filter_sku_history(history, inventory, query=query, filter_key=filter_key)
+
+    cbm_count = sum(1 for e in history if is_custom_blast_machine(e, inventory))
+    st.caption(
+        f"Showing **{len(filtered)}** of **{len(history)}** saved SKUs"
+        + (f"  ·  {cbm_count} custom (CBM)" if cbm_count else "")
+    )
+
+    _render_history_list(filtered, inventory, group_by)
 
 # ==================================================
 # DECODER PAGE
