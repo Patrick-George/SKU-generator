@@ -1383,19 +1383,36 @@ def _render_history_list(entries, inventory, group_by):
                 _render_history_entry_detail(entry, inventory)
 
 
-def _build_history_excel(entries):
-    """Build a minimal .xlsx of history rows: Short Code, SKU, Name/Description."""
+def _build_history_excel(entries, registry=None):
+    """Build .xlsx of history rows: Short Code, SKU, Name, Description, Date Created."""
+    sku_to_code = {}
+    for rec in (registry or {}).values():
+        sku = rec.get("sku")
+        code = rec.get("code")
+        if sku and code and sku not in sku_to_code:
+            sku_to_code[sku] = code
+
     rows = []
     for entry in entries:
-        name = (entry.get("mapped_name") or "").strip()
-        desc = (entry.get("description") or "").strip()
+        sku = entry.get("sku") or ""
+        short_code = entry.get("short_code") or sku_to_code.get(sku) or ""
+        date_str, time_str = format_history_timestamp(entry.get("timestamp"))
+        if date_str and time_str:
+            created = f"{date_str} {time_str}"
+        else:
+            created = date_str or time_str or (entry.get("timestamp") or "")
+
         rows.append({
-            "Short Code": entry.get("short_code") or "",
-            "SKU": entry.get("sku") or "",
-            "Name / Description": name or desc,
+            "Short Code": short_code,
+            "SKU": sku,
+            "Name": (entry.get("mapped_name") or "").strip(),
+            "Description": (entry.get("description") or "").strip(),
+            "Date Created": created,
         })
 
-    df = pd.DataFrame(rows, columns=["Short Code", "SKU", "Name / Description"])
+    df = pd.DataFrame(rows, columns=[
+        "Short Code", "SKU", "Name", "Description", "Date Created",
+    ])
     if not df.empty:
         parts = df["Short Code"].astype(str).str.rsplit("-", n=1, expand=True)
         df["_prefix"] = parts[0]
@@ -1427,6 +1444,7 @@ def history_page():
 
     history = st.session_state.get("sku_history", [])
     inventory = st.session_state.get("sku_data", {}).get("inventory", {})
+    registry = st.session_state.get("sku_data", {}).get("short_codes", {})
 
     if not history:
         st.markdown("---")
@@ -1468,7 +1486,7 @@ def history_page():
     tool_l, tool_r = st.columns(2, gap="small")
     with tool_l:
         if filtered:
-            excel_bytes = _build_history_excel(filtered)
+            excel_bytes = _build_history_excel(filtered, registry=registry)
             st.download_button(
                 f"⬇️ Download Excel ({len(filtered)})",
                 data=excel_bytes,
