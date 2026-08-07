@@ -473,13 +473,10 @@ def inject_app_theme():
         <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 
-        html, body, [class*="css"], .stApp {
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-            color: #f3f4f6;
-        }
-
         .stApp {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
             background: #2a2e38;
+            color: #f3f4f6;
         }
 
         header[data-testid="stHeader"] {
@@ -505,25 +502,11 @@ def inject_app_theme():
             color: #f3f4f6 !important;
         }
 
-        /* Clearer field boundaries */
-        [data-testid="stSelectbox"] > div > div,
-        [data-testid="stTextInput"] input,
-        [data-testid="stTextArea"] textarea,
-        [data-baseweb="input"],
-        [data-baseweb="select"] > div {
-            background-color: #353a46 !important;
-            border-color: #6b7385 !important;
-        }
-
         div[data-testid="stButton"] button[kind="secondary"],
         div[data-testid="stButton"] button[data-testid="baseButton-secondary"] {
             background-color: #3d4352 !important;
             border: 1px solid #7a8499 !important;
             color: #f3f4f6 !important;
-        }
-
-        div[data-testid="stCheckbox"] label p {
-            color: #e8eaed !important;
         }
 
         hr {

@@ -656,10 +656,28 @@ def admin():
                 st.session_state["confirm_delete_cat"] = cat
                 st.rerun()
 
-    tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(["🛠️ Fields Configuration", "🎁 Extras Management", "⚙️ Category Settings", "📊 Export Matrix", "💾 Backup & Restore", "🔗 Machine Mapping"])
+    admin_sections = [
+        "🛠️ Fields Configuration",
+        "🎁 Extras Management",
+        "⚙️ Category Settings",
+        "📊 Export Matrix",
+        "💾 Backup & Restore",
+        "🔗 Machine Mapping",
+    ]
+    # Only render the active section — st.tabs builds every tab's widgets on
+    # every rerun and can OOM the Render instance (Machine Mapping alone is
+    # hundreds of checkboxes alongside data editors in other tabs).
+    section = st.radio(
+        "Admin section",
+        admin_sections,
+        horizontal=True,
+        label_visibility="collapsed",
+        key=f"admin_section_{cat}",
+    )
+    st.markdown("---")
 
     # ---------- FIELDS CONFIG ----------
-    with tab1:
+    if section == "🛠️ Fields Configuration":
         cat_data = inv[cat]
         normalize_fields(cat_data)
         fields = cat_data["fields"]
@@ -791,7 +809,7 @@ def admin():
             st.info("No fields configured yet. Add a field above to get started.")
 
     # ---------- EXTRAS MANAGEMENT ----------
-    with tab2:
+    elif section == "🎁 Extras Management":
         cat_data = inv[cat]
         extras = cat_data.get("extras", [])
 
@@ -828,7 +846,7 @@ def admin():
                 st.write(f"**Layout:** 8 items per page")
 
     # ---------- CATEGORY SETTINGS ----------
-    with tab3:
+    elif section == "⚙️ Category Settings":
         cat_data = inv[cat]
         settings = cat_data.get("settings", {})
 
@@ -868,7 +886,7 @@ def admin():
                 st.info("ℹ️ Users will see checkboxes to select multiple extras")
 
     # ---------- EXPORT MATRIX ----------
-    with tab4:
+    elif section == "📊 Export Matrix":
         cat_data = inv[cat]
         normalize_fields(cat_data)
 
@@ -919,7 +937,7 @@ def admin():
                 st.warning("No fields configured yet. Add fields in the Fields Configuration tab.")
 
     # ---------- BACKUP & RESTORE ----------
-    with tab5:
+    elif section == "💾 Backup & Restore":
         st.markdown("### 💾 Database Backup & Restore")
         st.markdown("---")
 
@@ -1023,7 +1041,7 @@ def admin():
                     show_error(f"❌ Error reading file: {str(e)}")
 
     # ---------- MACHINE MAPPING ----------
-    with tab6:
+    elif section == "🔗 Machine Mapping":
         cat_data = inv[cat]
         normalize_fields(cat_data)
         fields = cat_data["fields"]
