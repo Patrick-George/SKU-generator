@@ -49,7 +49,61 @@ class GithubStorage:
         #   code_counters: prefix    -> last allocated sequence number
         data.setdefault("short_codes", {})
         data.setdefault("code_counters", {})
+
+        # One-time style migration: BL-3 -> BL-003 (min 3 digits; 1000+ unpadded).
+        if self._pad_short_codes_inplace(data):
+            try:
+                self.save(data)
+            except Exception:
+                pass
+
         return data
+
+    @staticmethod
+    def _pad_short_codes_inplace(data):
+        """Rewrite unpadded short codes to PREFIX-NNN. Returns True if anything changed."""
+        changed = False
+        short_codes = data.get("short_codes") or {}
+        history = data.get("sku_history") or []
+        old_to_new = {}
+
+        for rec in short_codes.values():
+            if not isinstance(rec, dict):
+                continue
+            prefix = rec.get("prefix")
+            seq = rec.get("seq")
+            if prefix is None or seq is None:
+                code = str(rec.get("code") or "")
+                if "-" in code:
+                    prefix, _, num = code.rpartition("-")
+                    if num.isdigit():
+                        seq = int(num)
+                        rec.setdefault("prefix", prefix)
+                        rec.setdefault("seq", seq)
+            if prefix is None or seq is None:
+                continue
+            try:
+                new_code = f"{str(prefix).upper()}-{int(seq):03d}"
+            except (TypeError, ValueError):
+                continue
+            old_code = rec.get("code")
+            if old_code != new_code:
+                if old_code:
+                    old_to_new[str(old_code)] = new_code
+                rec["code"] = new_code
+                rec["prefix"] = str(prefix).upper()
+                changed = True
+
+        if old_to_new:
+            for entry in history:
+                if not isinstance(entry, dict):
+                    continue
+                sc = entry.get("short_code")
+                if sc in old_to_new:
+                    entry["short_code"] = old_to_new[sc]
+                    changed = True
+
+        return changed
 
     def save(self, data):
         """Save configuration data to disk."""

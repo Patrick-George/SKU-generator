@@ -630,6 +630,16 @@ def get_short_code_prefix(category, sel, machine_field_name):
     return (letters[:3] or "SKU").upper()
 
 
+def format_short_code(prefix, seq):
+    """
+    Build a short code like BL-003.
+
+    Sequence is zero-padded to at least 3 digits; values >= 1000 keep their
+    natural width (BL-1000) so we can grow past 999 without a format break.
+    """
+    return f"{str(prefix).upper()}-{int(seq):03d}"
+
+
 def lookup_short_code(signature, short_codes):
     """Return the existing short code for a signature, or None. Read-only."""
     if not signature or not short_codes:
@@ -643,8 +653,8 @@ def allocate_short_code(signature, prefix, meta):
     Return the short code for `signature`, allocating a new one if needed.
 
     Idempotent: an already-registered signature returns its existing code and
-    does not consume a new number. New signatures get `PREFIX-<n>` where n is a
-    per-prefix running counter. Persists the registry to disk and returns
+    does not consume a new number. New signatures get `PREFIX-NNN` (3-digit
+    padded sequence). Persists the registry to disk and returns
     (code, short_codes, code_counters).
     """
     from storage import GithubStorage
@@ -660,7 +670,7 @@ def allocate_short_code(signature, prefix, meta):
 
     seq = int(counters.get(prefix, 0)) + 1
     counters[prefix] = seq
-    code = f"{prefix}-{seq}"
+    code = format_short_code(prefix, seq)
 
     record = {
         "code": code,

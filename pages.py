@@ -1479,13 +1479,26 @@ def history_page():
 # ==================================================
 # DECODER PAGE
 # ==================================================
+def _normalize_short_code_text(text):
+    """Uppercase and pad numeric suffix to at least 3 digits (BL-3 -> BL-003)."""
+    t = str(text).strip().upper()
+    if "-" not in t:
+        return t
+    prefix, _, num = t.rpartition("-")
+    if num.isdigit():
+        return f"{prefix}-{int(num):03d}"
+    return t
+
+
 def _find_registry_by_code(registry, text):
     """Return the saved short-code record matching `text` (case-insensitive), or None."""
     if not registry or not text:
         return None
     t = str(text).strip().upper()
+    t_padded = _normalize_short_code_text(t)
     for rec in registry.values():
-        if str(rec.get("code", "")).strip().upper() == t:
+        code = str(rec.get("code", "")).strip().upper()
+        if code == t or code == t_padded or _normalize_short_code_text(code) == t_padded:
             return rec
     return None
 
