@@ -63,12 +63,12 @@ def home():
         .subheading {
             font-size: 11px;
             font-weight: 700;
-            color: #8b919a;
+            color: #c0c6d0;
             text-transform: uppercase;
             letter-spacing: 1px;
             margin-bottom: 10px;
             padding-bottom: 6px;
-            border-bottom: 2px solid #2a2f3a;
+            border-bottom: 2px solid #5c6475;
         }
 
         .page-title {
@@ -76,13 +76,13 @@ def home():
             margin-bottom: 0;
             font-weight: 700;
             font-size: 26px;
-            color: #e8eaed;
+            color: #f3f4f6;
             letter-spacing: -0.5px;
         }
         .page-subtitle {
             text-align: center;
             font-size: 13px;
-            color: #8b919a;
+            color: #b8bec8;
             margin-bottom: 8px;
             font-weight: 400;
         }
@@ -90,7 +90,7 @@ def home():
         .config-label {
             font-size: 11px;
             font-weight: 600;
-            color: #8b919a;
+            color: #c0c6d0;
             margin-bottom: 3px;
             text-transform: uppercase;
             letter-spacing: 0.3px;
@@ -105,7 +105,7 @@ def home():
         }
 
         [data-testid="stHorizontalBlock"] > div:first-child {
-            border-right: 1px solid #2a2f3a;
+            border-right: 1px solid #5c6475;
             padding-right: 2rem;
         }
 
@@ -114,8 +114,8 @@ def home():
         }
 
         .fitting-breakdown {
-            background: #1a1d27;
-            border: 1px solid #2e3340;
+            background: #353a46;
+            border: 1px solid #6b7385;
             border-radius: 8px;
             padding: 10px 14px;
             margin-top: 6px;
@@ -130,19 +130,19 @@ def home():
         }
         .fitting-part-label {
             font-weight: 700;
-            color: #8b919a;
+            color: #c0c6d0;
             text-transform: uppercase;
             font-size: 10px;
             letter-spacing: 0.5px;
             margin-bottom: 2px;
         }
         .fitting-part-value {
-            color: #e8eaed;
+            color: #f3f4f6;
             font-weight: 500;
         }
         .fitting-divider {
             width: 1px;
-            background: #2e3340;
+            background: #6b7385;
             align-self: stretch;
         }
         </style>
@@ -382,8 +382,8 @@ def home():
                     )
                 else:
                     short_code_html = (
-                        '<div style="background:#1e1830;border:1.5px dashed #4a3a6a;border-radius:10px;'
-                        'padding:12px 16px;color:#b794f6;font-size:13px;font-style:italic;">'
+                        '<div style="background:#32284a;border:1.5px dashed #8b6fc0;border-radius:10px;'
+                        'padding:12px 16px;color:#d4b8ff;font-size:13px;font-style:italic;">'
                         'Assigned when you Save to History'
                         '</div>'
                     )
@@ -400,7 +400,7 @@ def home():
                     * {{ font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; margin: 0; padding: 0; box-sizing: border-box; }}
                     html, body {{ overflow: visible; }}
                     .section-label {{
-                        font-size: 11px; font-weight: 600; color: #8b919a; text-transform: uppercase;
+                        font-size: 11px; font-weight: 600; color: #c0c6d0; text-transform: uppercase;
                         letter-spacing: 0.8px; margin-bottom: 6px;
                     }}
                     .copy-card {{
@@ -409,40 +409,41 @@ def home():
                         cursor: pointer; transition: box-shadow 0.15s ease;
                         gap: 12px;
                     }}
-                    .copy-card:hover {{ box-shadow: 0 2px 10px rgba(0,0,0,0.35); }}
+                    .copy-card:hover {{ box-shadow: 0 2px 12px rgba(0,0,0,0.28); }}
                     .copy-card .text {{ word-break: break-word; flex: 1; }}
                     .copy-card .copy-btn {{
                         flex-shrink: 0; display: flex; flex-direction: column;
-                        align-items: center; gap: 1px; opacity: 0.6; transition: opacity 0.15s;
+                        align-items: center; gap: 1px; opacity: 0.75; transition: opacity 0.15s;
                     }}
                     .copy-card:hover .copy-btn {{ opacity: 1; }}
                     .copy-btn span {{ font-size: 18px; }}
                     .copy-btn p {{ font-size: 8px; font-weight: 500; margin: 0; }}
-                    .sku-card {{ background: #152238; border: 1.5px solid #2a4a7a; }}
-                    .sku-card .text {{ font-size: 18px; font-weight: 700; color: #6ba3ff; letter-spacing: 0.5px; }}
-                    .sku-card .copy-btn {{ color: #6ba3ff; }}
-                    .sku-card .copy-btn p {{ color: #5a8ad4; }}
-                    .code-card {{ background: #1e1830; border: 1.5px solid #4a3a6a; }}
-                    .code-card .text {{ font-size: 17px; font-weight: 700; color: #b794f6; letter-spacing: 0.5px; }}
-                    .code-card .copy-btn {{ color: #b794f6; }}
-                    .code-card .copy-btn p {{ color: #8b6fc0; }}
-                    .name-card {{ background: #15251a; border: 1.5px solid #2d5a3a; }}
-                    .name-card .text {{ font-size: 15px; font-weight: 600; color: #6bcf8a; }}
-                    .name-card .copy-btn {{ color: #6bcf8a; }}
-                    .name-card .copy-btn p {{ color: #4a9a62; }}
-                    .desc-card {{ background: #252018; border: 1.5px solid #5a4e2b; }}
-                    .desc-card .text {{ font-size: 14px; font-weight: 500; color: #d4c48a; }}
-                    .desc-card .copy-btn {{ color: #d4c48a; }}
-                    .desc-card .copy-btn p {{ color: #a89860; }}
+                    .sku-card {{ background: #243552; border: 1.5px solid #5a8fd4; }}
+                    .sku-card .text {{ font-size: 18px; font-weight: 700; color: #9ec5ff; letter-spacing: 0.5px; }}
+                    .sku-card .copy-btn {{ color: #9ec5ff; }}
+                    .sku-card .copy-btn p {{ color: #7aa8e8; }}
+                    .code-card {{ background: #32284a; border: 1.5px solid #8b6fc0; }}
+                    .code-card .text {{ font-size: 17px; font-weight: 700; color: #d4b8ff; letter-spacing: 0.5px; }}
+                    .code-card .copy-btn {{ color: #d4b8ff; }}
+                    .code-card .copy-btn p {{ color: #b08fe0; }}
+                    .name-card {{ background: #243a2c; border: 1.5px solid #4a9a62; }}
+                    .name-card .text {{ font-size: 15px; font-weight: 600; color: #8fdfab; }}
+                    .name-card .copy-btn {{ color: #8fdfab; }}
+                    .name-card .copy-btn p {{ color: #8fdfab; }}
+                    .desc-card {{ background: #3a3424; border: 1.5px solid #a09050; }}
+                    .desc-card .text {{ font-size: 14px; font-weight: 500; color: #e8d9a0; }}
+                    .desc-card .copy-btn {{ color: #e8d9a0; }}
+                    .desc-card .copy-btn p {{ color: #c4b070; }}
                     .breakdown {{ margin-top: 4px; }}
                     .breakdown-row {{
                         display: flex; align-items: center; gap: 8px;
-                        padding: 4px 0; font-size: 13px; color: #c0c4cc;
+                        padding: 4px 0; font-size: 13px; color: #e0e3e8;
                     }}
                     .breakdown-code {{
-                        background: #232733; color: #6ba3ff; padding: 2px 8px;
+                        background: #3d4352; color: #9ec5ff; padding: 2px 8px;
                         border-radius: 4px; font-size: 12px; font-weight: 600;
                         font-family: 'SF Mono', 'Fira Code', monospace; min-width: 28px; text-align: center;
+                        border: 1px solid #5a8fd4;
                     }}
                 </style>
 
@@ -1210,8 +1211,8 @@ def _render_history_entry_detail(entry, inventory):
     sku_escaped = html.escape(entry.get("sku", ""))
     copy_html = f"""
     <button onclick="navigator.clipboard.writeText('{sku_escaped}'); this.innerText='✓ Copied'"
-        style="background: #152238; border: 1px solid #4d8dff; border-radius: 6px;
-        padding: 7px 14px; cursor: pointer; color: #6ba3ff; font-size: 15px; margin-bottom: 12px;">
+        style="background: #243552; border: 1px solid #4d8dff; border-radius: 6px;
+        padding: 7px 14px; cursor: pointer; color: #9ec5ff; font-size: 15px; margin-bottom: 12px;">
         📋 Copy SKU
     </button>
     """
@@ -1222,14 +1223,14 @@ def _render_history_entry_detail(entry, inventory):
         sc_escaped = html.escape(str(short_code))
         st.markdown(
             f"<div style='display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:12px;'>"
-            f"<div style='display:inline-block;background:#1e1830;border:1.5px solid #4a3a6a;"
+            f"<div style='display:inline-block;background:#32284a;border:1.5px solid #8b6fc0;"
             f"border-radius:8px;padding:8px 14px;'>"
-            f"<span style='color:#8b919a;font-weight:600;font-size:13px;'>Short Code</span> "
-            f"<span style='color:#b794f6;font-weight:700;font-size:16px;'>{sc_escaped}</span>"
+            f"<span style='color:#c0c6d0;font-weight:600;font-size:13px;'>Short Code</span> "
+            f"<span style='color:#d4b8ff;font-weight:700;font-size:16px;'>{sc_escaped}</span>"
             f"</div>"
             f"<button onclick=\"navigator.clipboard.writeText('{sc_escaped}'); this.innerText='✓ Copied'\""
-            f" style='background:#1e1830;border:1px solid #4a3a6a;border-radius:6px;"
-            f"padding:7px 12px;cursor:pointer;color:#b794f6;font-size:14px;'>"
+            f" style='background:#32284a;border:1px solid #8b6fc0;border-radius:6px;"
+            f"padding:7px 12px;cursor:pointer;color:#d4b8ff;font-size:14px;'>"
             f"Copy Short Code</button>"
             f"</div>",
             unsafe_allow_html=True,
@@ -1243,10 +1244,10 @@ def _render_history_entry_detail(entry, inventory):
         elif client_abbr:
             client_label = client_abbr
         st.markdown(
-            f"<div style='background:#152238;border:1px solid #2a4a7a;border-radius:8px;"
+            f"<div style='background:#243552;border:1px solid #5a8fd4;border-radius:8px;"
             f"padding:10px 14px;margin-bottom:12px;'>"
-            f"<span style='color:#8b919a;font-weight:600;font-size:13px;'>Client</span>"
-            f"<div style='color:#6ba3ff;font-weight:700;font-size:17px;'>{html.escape(client_label)}</div>"
+            f"<span style='color:#c0c6d0;font-weight:600;font-size:13px;'>Client</span>"
+            f"<div style='color:#9ec5ff;font-weight:700;font-size:17px;'>{html.escape(client_label)}</div>"
             f"</div>",
             unsafe_allow_html=True,
         )
@@ -1255,21 +1256,21 @@ def _render_history_entry_detail(entry, inventory):
     if date_str or time_str:
         st.markdown(
             f"<div style='display:flex;gap:24px;margin-bottom:14px;font-size:15px;'>"
-            f"<div><span style='color:#8b919a;font-weight:600;'>Date</span>"
-            f"<div style='color:#e8eaed;font-weight:600;'>{html.escape(date_str)}</div></div>"
-            f"<div><span style='color:#8b919a;font-weight:600;'>Time</span>"
-            f"<div style='color:#e8eaed;font-weight:600;'>{html.escape(time_str)} IST</div></div>"
+            f"<div><span style='color:#c0c6d0;font-weight:600;'>Date</span>"
+            f"<div style='color:#f3f4f6;font-weight:600;'>{html.escape(date_str)}</div></div>"
+            f"<div><span style='color:#c0c6d0;font-weight:600;'>Time</span>"
+            f"<div style='color:#f3f4f6;font-weight:600;'>{html.escape(time_str)} IST</div></div>"
             f"</div>",
             unsafe_allow_html=True,
         )
 
     if mapped_name and cat != "Blast Machine":
         st.markdown("**Item Name**")
-        st.markdown(f"<div style='background:#15251a;border:1px solid #2d5a3a;border-radius:8px;padding:10px 14px;font-weight:600;font-size:16px;color:#6bcf8a;'>{html.escape(mapped_name)}</div>", unsafe_allow_html=True)
+        st.markdown(f"<div style='background:#243a2c;border:1px solid #4a9a62;border-radius:8px;padding:10px 14px;font-weight:600;font-size:16px;color:#8fdfab;'>{html.escape(mapped_name)}</div>", unsafe_allow_html=True)
 
     if mapped_desc:
         st.markdown("**Item Description**")
-        st.markdown(f"<div style='background:#252018;border:1px solid #5a4e2b;border-radius:8px;padding:10px 14px;font-size:15px;color:#d4c48a;'>{html.escape(mapped_desc)}</div>", unsafe_allow_html=True)
+        st.markdown(f"<div style='background:#3a3424;border:1px solid #a09050;border-radius:8px;padding:10px 14px;font-size:15px;color:#e8d9a0;'>{html.escape(mapped_desc)}</div>", unsafe_allow_html=True)
 
     if config:
         st.markdown("**Configuration**")
@@ -1280,18 +1281,18 @@ def _render_history_entry_detail(entry, inventory):
             if is_text:
                 st.markdown(
                     f"<div style='padding:5px 0;font-size:15px;'>"
-                    f"<span style='color:#8b919a;font-weight:600;'>{html.escape(field_name)}</span>"
-                    f"<div style='margin-top:3px;color:#c0c4cc;white-space:pre-wrap;background:#1a1d27;"
-                    f"border:1px solid #2e3340;border-radius:6px;padding:8px 12px;'>{html.escape(name)}</div>"
+                    f"<span style='color:#c0c6d0;font-weight:600;'>{html.escape(field_name)}</span>"
+                    f"<div style='margin-top:3px;color:#e0e3e8;white-space:pre-wrap;background:#353a46;"
+                    f"border:1px solid #6b7385;border-radius:6px;padding:8px 12px;'>{html.escape(name)}</div>"
                     f"</div>",
                     unsafe_allow_html=True,
                 )
             else:
                 st.markdown(
                     f"<div style='display:flex;gap:10px;align-items:center;padding:5px 0;font-size:15px;'>"
-                    f"<span style='min-width:130px;color:#8b919a;font-weight:600;'>{html.escape(field_name)}</span>"
-                    f"<span style='background:#232733;color:#6ba3ff;padding:2px 8px;border-radius:4px;font-family:monospace;font-size:14px;'>{html.escape(str(code))}</span>"
-                    f"<span style='color:#c0c4cc;'>{html.escape(name)}</span>"
+                    f"<span style='min-width:130px;color:#c0c6d0;font-weight:600;'>{html.escape(field_name)}</span>"
+                    f"<span style='background:#3d4352;color:#9ec5ff;padding:2px 8px;border-radius:4px;font-family:monospace;font-size:14px;'>{html.escape(str(code))}</span>"
+                    f"<span style='color:#e0e3e8;'>{html.escape(name)}</span>"
                     f"</div>",
                     unsafe_allow_html=True,
                 )
@@ -1301,8 +1302,8 @@ def _render_history_entry_detail(entry, inventory):
         for extra in extras:
             st.markdown(
                 f"<div style='display:flex;gap:10px;align-items:center;padding:5px 0;font-size:15px;'>"
-                f"<span style='background:#232733;color:#6ba3ff;padding:2px 8px;border-radius:4px;font-family:monospace;font-size:14px;'>{html.escape(str(extra.get('code', '')))}</span>"
-                f"<span style='color:#c0c4cc;'>{html.escape(extra.get('name', ''))}</span>"
+                f"<span style='background:#3d4352;color:#9ec5ff;padding:2px 8px;border-radius:4px;font-family:monospace;font-size:14px;'>{html.escape(str(extra.get('code', '')))}</span>"
+                f"<span style='color:#e0e3e8;'>{html.escape(extra.get('name', ''))}</span>"
                 f"</div>",
                 unsafe_allow_html=True,
             )
@@ -1313,8 +1314,8 @@ def _render_history_entry_detail(entry, inventory):
             field_label = item.get("field")
             prefix = f"{html.escape(field_label)}: " if field_label else ""
             st.markdown(
-                f"<div style='display:flex;gap:8px;align-items:center;padding:4px 0;font-size:15px;color:#c0c4cc;'>"
-                f"<span style='background:#232733;color:#6ba3ff;padding:2px 8px;border-radius:4px;font-family:monospace;font-size:14px;'>{html.escape(str(item.get('code', '')))}</span>"
+                f"<div style='display:flex;gap:8px;align-items:center;padding:4px 0;font-size:15px;color:#e0e3e8;'>"
+                f"<span style='background:#3d4352;color:#9ec5ff;padding:2px 8px;border-radius:4px;font-family:monospace;font-size:14px;'>{html.escape(str(item.get('code', '')))}</span>"
                 f"<span>{prefix}{html.escape(item.get('name', ''))}</span>"
                 f"</div>",
                 unsafe_allow_html=True,
@@ -1364,9 +1365,9 @@ def _render_history_list(entries, inventory, group_by):
     for section_title, section_entries in sections:
         if group_by != "recent":
             st.markdown(
-                f"<div style='margin:14px 0 6px 0;font-size:15px;font-weight:700;color:#e8eaed;'>"
+                f"<div style='margin:14px 0 6px 0;font-size:15px;font-weight:700;color:#f3f4f6;'>"
                 f"{html.escape(section_title)}"
-                f"<span style='color:#8b919a;font-weight:600;font-size:13px;'>"
+                f"<span style='color:#c0c6d0;font-weight:600;font-size:13px;'>"
                 f"  ·  {len(section_entries)} SKU{'s' if len(section_entries) != 1 else ''}"
                 f"</span></div>",
                 unsafe_allow_html=True,
@@ -1553,8 +1554,8 @@ def _render_short_code_result(rec):
     if full_sku:
         st.markdown("**Full SKU**")
         st.markdown(
-            f'<div style="background:#152238;border:1.5px solid #2a4a7a;border-radius:8px;'
-            f'padding:12px 16px;font-weight:700;color:#6ba3ff;">{html.escape(full_sku)}</div>',
+            f'<div style="background:#243552;border:1.5px solid #5a8fd4;border-radius:8px;'
+            f'padding:12px 16px;font-weight:700;color:#9ec5ff;">{html.escape(full_sku)}</div>',
             unsafe_allow_html=True,
         )
 
@@ -1563,15 +1564,15 @@ def _render_short_code_result(rec):
     if item_name:
         st.markdown("**Item Name**")
         st.markdown(
-            f'<div style="background:#15251a;border:1.5px solid #2d5a3a;border-radius:8px;'
-            f'padding:12px 16px;font-weight:600;color:#6bcf8a;">{html.escape(item_name)}</div>',
+            f'<div style="background:#243a2c;border:1.5px solid #4a9a62;border-radius:8px;'
+            f'padding:12px 16px;font-weight:600;color:#8fdfab;">{html.escape(item_name)}</div>',
             unsafe_allow_html=True,
         )
     if item_desc:
         st.markdown("**Item Description**")
         st.markdown(
-            f'<div style="background:#252018;border:1.5px solid #5a4e2b;border-radius:8px;'
-            f'padding:12px 16px;color:#d4c48a;">{html.escape(item_desc)}</div>',
+            f'<div style="background:#3a3424;border:1.5px solid #a09050;border-radius:8px;'
+            f'padding:12px 16px;color:#e8d9a0;">{html.escape(item_desc)}</div>',
             unsafe_allow_html=True,
         )
 
@@ -1594,7 +1595,7 @@ def decoder_page():
         render_sidebar_nav("decoder")
 
     st.markdown("<h2 style='text-align: center;'>🔍 SKU Decoder</h2>", unsafe_allow_html=True)
-    st.markdown("<p style='text-align: center; color: #8b919a;'>Enter a SKU code to see what each part means</p>", unsafe_allow_html=True)
+    st.markdown("<p style='text-align: center; color: #c0c6d0;'>Enter a SKU code to see what each part means</p>", unsafe_allow_html=True)
 
     st.markdown("---")
 
@@ -1611,7 +1612,7 @@ def decoder_page():
                 "🔍 Decode", use_container_width=True, type="primary"
             )
 
-        st.markdown("<p style='text-align: center; font-size: 12px; color: #8b919a;'>Type or paste any SKU code, then press Enter or click Decode</p>", unsafe_allow_html=True)
+        st.markdown("<p style='text-align: center; font-size: 12px; color: #c0c6d0;'>Type or paste any SKU code, then press Enter or click Decode</p>", unsafe_allow_html=True)
 
     if decode_input:
         st.markdown("---")
@@ -1648,15 +1649,15 @@ def decoder_page():
                 if item_name:
                     st.markdown("**Item Name**")
                     st.markdown(
-                        f'<div style="background:#15251a;border:1.5px solid #2d5a3a;border-radius:8px;'
-                        f'padding:12px 16px;font-weight:600;color:#6bcf8a;">{html.escape(item_name)}</div>',
+                        f'<div style="background:#243a2c;border:1.5px solid #4a9a62;border-radius:8px;'
+                        f'padding:12px 16px;font-weight:600;color:#8fdfab;">{html.escape(item_name)}</div>',
                         unsafe_allow_html=True,
                     )
                 if item_desc:
                     st.markdown("**Item Description**")
                     st.markdown(
-                        f'<div style="background:#252018;border:1.5px solid #5a4e2b;border-radius:8px;'
-                        f'padding:12px 16px;color:#d4c48a;">{html.escape(item_desc)}</div>',
+                        f'<div style="background:#3a3424;border:1.5px solid #a09050;border-radius:8px;'
+                        f'padding:12px 16px;color:#e8d9a0;">{html.escape(item_desc)}</div>',
                         unsafe_allow_html=True,
                     )
             else:
@@ -1707,7 +1708,7 @@ def category_items_page():
         render_sidebar_nav("category_items")
 
     st.markdown("<h2 style='text-align: center;'>📂 Category - Item Pairs</h2>", unsafe_allow_html=True)
-    st.markdown("<p style='text-align: center; color: #8b919a;'>Reference table of product categories and their item groups</p>", unsafe_allow_html=True)
+    st.markdown("<p style='text-align: center; color: #c0c6d0;'>Reference table of product categories and their item groups</p>", unsafe_allow_html=True)
 
     st.markdown("---")
 

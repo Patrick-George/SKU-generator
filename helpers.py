@@ -475,20 +475,20 @@ def inject_app_theme():
 
         html, body, [class*="css"], .stApp {
             font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-            color: #e8eaed;
+            color: #f3f4f6;
         }
 
         .stApp {
-            background: #0f1117;
+            background: #2a2e38;
         }
 
         header[data-testid="stHeader"] {
-            background: rgba(15, 17, 23, 0.85);
+            background: rgba(42, 46, 56, 0.92);
         }
 
         [data-testid="stSidebar"] {
-            background: #14161e !important;
-            border-right: 1px solid #2a2f3a;
+            background: #252933 !important;
+            border-right: 1px solid #5c6475;
         }
 
         [data-testid="stSidebar"] .block-container {
@@ -496,21 +496,38 @@ def inject_app_theme():
         }
 
         [data-testid="stExpander"] {
-            background: #1a1d27;
-            border: 1px solid #2e3340;
+            background: #353a46;
+            border: 1px solid #5c6475;
             border-radius: 8px;
         }
 
         div[data-testid="stExpander"] details summary p {
+            color: #f3f4f6 !important;
+        }
+
+        /* Clearer field boundaries */
+        [data-testid="stSelectbox"] > div > div,
+        [data-testid="stTextInput"] input,
+        [data-testid="stTextArea"] textarea,
+        [data-baseweb="input"],
+        [data-baseweb="select"] > div {
+            background-color: #353a46 !important;
+            border-color: #6b7385 !important;
+        }
+
+        div[data-testid="stButton"] button[kind="secondary"],
+        div[data-testid="stButton"] button[data-testid="baseButton-secondary"] {
+            background-color: #3d4352 !important;
+            border: 1px solid #7a8499 !important;
+            color: #f3f4f6 !important;
+        }
+
+        div[data-testid="stCheckbox"] label p {
             color: #e8eaed !important;
         }
 
-        /* Soften secondary buttons on dark chrome */
-        div[data-testid="stButton"] button[kind="secondary"],
-        div[data-testid="stButton"] button[data-testid="baseButton-secondary"] {
-            background-color: #1a1d27;
-            border: 1px solid #3a4050;
-            color: #e8eaed;
+        hr {
+            border-color: #5c6475 !important;
         }
 
         .block-container {
@@ -552,7 +569,7 @@ def render_sidebar_nav(current_page="home"):
         </script>
     """, unsafe_allow_html=True)
 
-    st.markdown("<p style='font-size:13px;font-weight:700;color:#8b919a;text-transform:uppercase;letter-spacing:1px;font-family:Inter,sans-serif;'>Navigation</p>", unsafe_allow_html=True)
+    st.markdown("<p style='font-size:13px;font-weight:700;color:#c0c6d0;text-transform:uppercase;letter-spacing:1px;font-family:Inter,sans-serif;'>Navigation</p>", unsafe_allow_html=True)
 
     pages = [
         ("home", "SKU Generator"),
