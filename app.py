@@ -3,6 +3,7 @@ import os
 import streamlit as st
 from storage import GithubStorage
 from pages import home, login, admin, history_page, decoder_page, category_items_page
+from helpers import inject_app_theme
 
 # ==================================================
 # SETUP
@@ -12,6 +13,8 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="collapsed"
 )
+
+inject_app_theme()
 
 _logo_path = os.path.join(os.path.dirname(__file__), "assets", "blastline_logo.png")
 if os.path.exists(_logo_path):

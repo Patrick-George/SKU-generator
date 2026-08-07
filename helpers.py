@@ -466,6 +466,62 @@ def show_info(message):
     st.info(message)
 
 
+def inject_app_theme():
+    """Apply global dark theme overrides for Streamlit chrome and custom widgets."""
+    st.markdown(
+        """
+        <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+        html, body, [class*="css"], .stApp {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            color: #e8eaed;
+        }
+
+        .stApp {
+            background: #0f1117;
+        }
+
+        header[data-testid="stHeader"] {
+            background: rgba(15, 17, 23, 0.85);
+        }
+
+        [data-testid="stSidebar"] {
+            background: #14161e !important;
+            border-right: 1px solid #2a2f3a;
+        }
+
+        [data-testid="stSidebar"] .block-container {
+            padding-top: 1.5rem;
+        }
+
+        [data-testid="stExpander"] {
+            background: #1a1d27;
+            border: 1px solid #2e3340;
+            border-radius: 8px;
+        }
+
+        div[data-testid="stExpander"] details summary p {
+            color: #e8eaed !important;
+        }
+
+        /* Soften secondary buttons on dark chrome */
+        div[data-testid="stButton"] button[kind="secondary"],
+        div[data-testid="stButton"] button[data-testid="baseButton-secondary"] {
+            background-color: #1a1d27;
+            border: 1px solid #3a4050;
+            color: #e8eaed;
+        }
+
+        .block-container {
+            padding-top: 2rem;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
 # ==================================================
 # NAVIGATION
 # ==================================================
@@ -496,18 +552,7 @@ def render_sidebar_nav(current_page="home"):
         </script>
     """, unsafe_allow_html=True)
 
-    st.markdown("""
-        <style>
-        [data-testid="stSidebar"] {
-            background: #fafbfc;
-        }
-        [data-testid="stSidebar"] .block-container {
-            padding-top: 1.5rem;
-        }
-        </style>
-    """, unsafe_allow_html=True)
-
-    st.markdown("<p style='font-size:13px;font-weight:700;color:#aaa;text-transform:uppercase;letter-spacing:1px;font-family:Inter,sans-serif;'>Navigation</p>", unsafe_allow_html=True)
+    st.markdown("<p style='font-size:13px;font-weight:700;color:#8b919a;text-transform:uppercase;letter-spacing:1px;font-family:Inter,sans-serif;'>Navigation</p>", unsafe_allow_html=True)
 
     pages = [
         ("home", "SKU Generator"),
