@@ -258,8 +258,8 @@ def normalize_fields(cat):
 
 
 def ordered_fields(fields):
-    """Return field names sorted by their order value."""
-    return sorted(fields.keys(), key=lambda k: fields[k].get("order", 999))
+    """Return field names sorted by their order value (stable tie-break on name)."""
+    return sorted(fields.keys(), key=lambda k: (fields[k].get("order", 999), k))
 
 
 def is_text_field(field_data):

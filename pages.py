@@ -4,7 +4,6 @@ import json
 import os
 import io
 import html
-from streamlit_sortables import sort_items
 
 from storage import GithubStorage
 from helpers import (
@@ -706,23 +705,47 @@ def admin():
                         st.rerun()
 
         if fields:
-            with st.expander("🔀 Field Order", expanded=False):
-                st.caption("Drag fields to reorder them. The order from top to bottom is the order used in SKUs.")
-                current_order = ordered_fields(fields)
-                sorted_fields = sort_items(
-                    current_order,
-                    direction="vertical",
-                    key=f"field_order_sort_{cat}",
-                )
-                if sorted_fields and sorted_fields != current_order:
-                    for idx, fname in enumerate(sorted_fields, start=1):
-                        if fname in fields:
-                            fields[fname]["order"] = idx
-                    st.rerun()
+            # Heavy widgets are gated behind toggles — Streamlit still executes
+            # collapsed expander bodies, which was mounting sortables + data_editor
+            # on every Fields Configuration view and crashing Render (exit 139).
+            st.markdown("##### Field tools")
+            tool = st.radio(
+                "Field tool",
+                ["None", "Reorder fields", "Rename / Delete", "Edit options"],
+                horizontal=True,
+                label_visibility="collapsed",
+                key=f"field_tool_{cat}",
+            )
 
-            with st.expander("✏️ Rename / Delete Field", expanded=False):
-                field = st.selectbox("Select Field", ordered_fields(fields))
-                new_name = st.text_input("Rename Field To", value=field)
+            if tool == "Reorder fields":
+                st.caption("Use ↑ / ↓ to change SKU field order.")
+                current_order = ordered_fields(fields)
+                for i, fname in enumerate(current_order):
+                    c1, c2, c3 = st.columns([6, 1, 1])
+                    c1.markdown(f"**{i + 1}.** {fname}")
+                    if c2.button("↑", key=f"field_up_{cat}_{fname}", disabled=i == 0):
+                        prev = current_order[i - 1]
+                        fields[fname]["order"], fields[prev]["order"] = (
+                            fields[prev].get("order", i),
+                            fields[fname].get("order", i + 1),
+                        )
+                        # Normalize to 1..n so ties never loop
+                        for idx, name_ in enumerate(ordered_fields(fields), start=1):
+                            fields[name_]["order"] = idx
+                        st.rerun()
+                    if c3.button("↓", key=f"field_down_{cat}_{fname}", disabled=i == len(current_order) - 1):
+                        nxt = current_order[i + 1]
+                        fields[fname]["order"], fields[nxt]["order"] = (
+                            fields[nxt].get("order", i + 2),
+                            fields[fname].get("order", i + 1),
+                        )
+                        for idx, name_ in enumerate(ordered_fields(fields), start=1):
+                            fields[name_]["order"] = idx
+                        st.rerun()
+
+            elif tool == "Rename / Delete":
+                field = st.selectbox("Select Field", ordered_fields(fields), key=f"rename_field_select_{cat}")
+                new_name = st.text_input("Rename Field To", value=field, key=f"rename_field_input_{cat}")
 
                 if st.session_state.get("confirm_delete_field") == field:
                     st.warning(f"⚠️ Are you sure you want to delete field '{field}'? This cannot be undone!")
@@ -739,7 +762,7 @@ def admin():
                             st.rerun()
                 else:
                     c1, c2 = st.columns(2)
-                    if c1.button("Rename", use_container_width=True):
+                    if c1.button("Rename", use_container_width=True, key=f"rename_field_btn_{cat}"):
                         if new_name == field:
                             show_info("Field name unchanged.")
                         elif new_name and new_name not in fields:
@@ -749,12 +772,16 @@ def admin():
                         elif new_name in fields:
                             show_error(f"Field '{new_name}' already exists!")
 
-                    if c2.button("Delete", use_container_width=True):
+                    if c2.button("Delete", use_container_width=True, key=f"delete_field_btn_{cat}"):
                         st.session_state["confirm_delete_field"] = field
                         st.rerun()
 
-            with st.expander("🛠️ Field Options", expanded=False):
-                field_for_options = st.selectbox("Select Field to Edit Options", ordered_fields(fields), key="field_options_select")
+            elif tool == "Edit options":
+                field_for_options = st.selectbox(
+                    "Select Field to Edit Options",
+                    ordered_fields(fields),
+                    key="field_options_select",
+                )
                 opts = fields[field_for_options]["options"]
                 if opts and opts[0].get("type") == "text":
                     st.info("This is a text input field - users will enter values manually.")
@@ -781,13 +808,11 @@ def admin():
                             "different code (e.g. `NA`, `NF`) is recommended to avoid ambiguity."
                         )
 
-                    # Snapshot the dataframe once per (cat, field) and reuse the
-                    # SAME object on every rerun. st.data_editor resets its pending
-                    # edits whenever the `data` arg's hash changes between reruns,
-                    # so rebuilding df2 from the just-saved opts each run silently
-                    # drops in-flight keystrokes. Holding a stable snapshot here is
-                    # what makes typed input persist on the first try.
                     df_key = f"options_df_{cat}_{field_for_options}"
+                    # Refresh snapshot when switching fields so the editor matches disk data
+                    if st.session_state.get(f"{df_key}_field") != field_for_options:
+                        st.session_state[df_key] = normalize_option_df(opts)
+                        st.session_state[f"{df_key}_field"] = field_for_options
                     if df_key not in st.session_state:
                         st.session_state[df_key] = normalize_option_df(opts)
                     edited_df = st.data_editor(
@@ -805,6 +830,8 @@ def admin():
                         }
                     )
                     fields[field_for_options]["options"] = merge_editor_records(opts, edited_df.to_dict("records"))
+            else:
+                st.caption("Choose a tool above to reorder, rename, or edit field options.")
         else:
             st.info("No fields configured yet. Add a field above to get started.")
 
@@ -813,12 +840,9 @@ def admin():
         cat_data = inv[cat]
         extras = cat_data.get("extras", [])
 
-        with st.expander("🎁 Manage Extras / Add-ons", expanded=False):
-            st.info(f"Extras will be displayed as a list (8 per page) in the configurator with pagination controls.")
-
-            # Snapshot once per category for the same reason as Field Options
-            # above — feeding a freshly-built DataFrame on every rerun makes
-            # st.data_editor drop pending keystrokes when its `data` hash flips.
+        st.info("Extras are shown 8 per page in the configurator with pagination.")
+        edit_extras = st.toggle("Open extras editor", value=False, key=f"edit_extras_{cat}")
+        if edit_extras:
             extras_df_key = f"extras_df_{cat}"
             if extras_df_key not in st.session_state:
                 st.session_state[extras_df_key] = normalize_extras_df(extras)
@@ -837,13 +861,14 @@ def admin():
                 }
             )
             cat_data["extras"] = merge_editor_records(extras, edited_extras.to_dict("records"))
+            extras = cat_data["extras"]
 
         if len(extras) > 0:
-            with st.expander("📋 Preview", expanded=False):
-                st.write(f"**Total Extras:** {len(extras)}")
-                total_pages = (len(extras) - 1) // EXTRAS_PER_PAGE + 1 if len(extras) > 0 else 1
-                st.write(f"**Pages in Configurator:** {total_pages}")
-                st.write(f"**Layout:** 8 items per page")
+            st.write(f"**Total Extras:** {len(extras)}")
+            total_pages = (len(extras) - 1) // EXTRAS_PER_PAGE + 1 if len(extras) > 0 else 1
+            st.write(f"**Pages in Configurator:** {total_pages}  ·  8 items per page")
+        else:
+            st.caption("No extras yet — turn on the editor above to add some.")
 
     # ---------- CATEGORY SETTINGS ----------
     elif section == "⚙️ Category Settings":
@@ -1080,48 +1105,60 @@ def admin():
                     selected_machine_code = machine_opts[machine_labels.index(selected_label)]["code"]
 
                     other_fields = [f for f in field_names if f != mf_name]
-                    non_text_fields = [f for f in other_fields if not (fields[f]["options"] and fields[f]["options"][0].get("type") == "text")]
-                    text_fields = [f for f in other_fields if fields[f]["options"] and fields[f]["options"][0].get("type") == "text"]
+                    non_text_fields = [
+                        f for f in other_fields
+                        if not (fields[f]["options"] and fields[f]["options"][0].get("type") == "text")
+                    ]
 
                     st.markdown("---")
 
-                    with st.expander("📋 Field Visibility", expanded=True):
-                        st.caption("Check fields that should be **visible** when this machine is selected. Unchecked fields will be hidden.")
-                        field_checks = {}
-                        for f in other_fields:
-                            has_machines_key = "machines" in fields[f]
-                            current_machines = fields[f].get("machines", [])
-                            default_on = (not has_machines_key) or selected_machine_code in current_machines
-                            field_checks[f] = st.checkbox(f, value=default_on, key=f"fv_{cat}_{selected_machine_code}_{f}")
+                    st.markdown("##### Field visibility")
+                    st.caption("Check fields that should be **visible** when this machine is selected.")
+                    field_checks = {}
+                    for f in other_fields:
+                        has_machines_key = "machines" in fields[f]
+                        current_machines = fields[f].get("machines", [])
+                        default_on = (not has_machines_key) or selected_machine_code in current_machines
+                        field_checks[f] = st.checkbox(f, value=default_on, key=f"fv_{cat}_{selected_machine_code}_{f}")
 
-                    if non_text_fields:
+                    option_checks = {}
+                    extras_checks = {}
+
+                    # Option/extras checkboxes are opt-in — Streamlit still builds
+                    # widgets inside collapsed expanders, which was enough to tip
+                    # free Render over into exit 139 under memory pressure.
+                    map_detail = st.radio(
+                        "More mapping",
+                        ["Fields only", "Option visibility", "Extras visibility"],
+                        horizontal=True,
+                        key=f"map_detail_{cat}_{selected_machine_code}",
+                    )
+
+                    if map_detail == "Option visibility" and non_text_fields:
                         visible_dropdown_fields = [f for f in non_text_fields if field_checks.get(f, True)]
                         if visible_dropdown_fields:
-                            with st.expander("🔧 Option Visibility (per field)", expanded=False):
-                                st.caption("For each visible dropdown field, check which options are available for this machine.")
-                                option_checks = {}
-                                for f in visible_dropdown_fields:
-                                    st.markdown(f"**{f}**")
-                                    opts = fields[f]["options"]
-                                    option_checks[f] = {}
-                                    for i, opt in enumerate(opts):
-                                        if not opt.get("code"):
-                                            continue
-                                        has_machines_key = "machines" in opt
-                                        opt_machines = opt.get("machines", [])
-                                        default_on = (not has_machines_key) or selected_machine_code in opt_machines
-                                        label = f"{opt['code']} - {opt.get('name', '')}"
-                                        option_checks[f][i] = st.checkbox(label, value=default_on, key=f"ov_{cat}_{selected_machine_code}_{f}_{i}")
-                                    st.markdown("---")
+                            st.caption("For each visible dropdown field, check which options are available for this machine.")
+                            for f in visible_dropdown_fields:
+                                st.markdown(f"**{f}**")
+                                opts = fields[f]["options"]
+                                option_checks[f] = {}
+                                for i, opt in enumerate(opts):
+                                    if not opt.get("code"):
+                                        continue
+                                    has_machines_key = "machines" in opt
+                                    opt_machines = opt.get("machines", [])
+                                    default_on = (not has_machines_key) or selected_machine_code in opt_machines
+                                    label = f"{opt['code']} - {opt.get('name', '')}"
+                                    option_checks[f][i] = st.checkbox(
+                                        label,
+                                        value=default_on,
+                                        key=f"ov_{cat}_{selected_machine_code}_{f}_{i}",
+                                    )
                         else:
-                            option_checks = {}
-                    else:
-                        option_checks = {}
-
-                    if extras:
-                        with st.expander("🎁 Extras Visibility", expanded=False):
+                            st.info("No visible dropdown fields for this machine.")
+                    elif map_detail == "Extras visibility":
+                        if extras:
                             st.caption("Check which extras are available when this machine is selected.")
-                            extras_checks = {}
                             for i, e in enumerate(extras):
                                 if not e.get("code"):
                                     continue
@@ -1129,9 +1166,13 @@ def admin():
                                 e_machines = e.get("machines", [])
                                 default_on = (not has_machines_key) or selected_machine_code in e_machines
                                 label = f"{e['code']} - {e.get('name', '')}"
-                                extras_checks[i] = st.checkbox(label, value=default_on, key=f"ev_{cat}_{selected_machine_code}_{i}")
-                    else:
-                        extras_checks = {}
+                                extras_checks[i] = st.checkbox(
+                                    label,
+                                    value=default_on,
+                                    key=f"ev_{cat}_{selected_machine_code}_{i}",
+                                )
+                        else:
+                            st.info("No extras configured for this category.")
 
                     all_machine_codes = [o["code"] for o in machine_opts if o.get("code")]
 
