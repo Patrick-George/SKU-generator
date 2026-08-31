@@ -186,19 +186,19 @@ def generate_mapped_name_and_description(sel, ordered_field_names, chosen, fitti
             continue
         is_fittings = k.lower() == "fittings"
         if not is_fittings:
-            tn = s.get("tally_name", "").strip()
+            tn = (s.get("tally_name") or "").strip()
             if tn:
                 tally_parts.append(tn)
-            dd = s.get("description", "").strip()
+            dd = (s.get("description") or "").strip()
             if dd:
                 desc_parts.append(dd)
         else:
-            fittings_desc = s.get("description", "").strip()
+            fittings_desc = (s.get("description") or "").strip()
 
     item_name = " ".join(tally_parts)
 
     if chosen:
-        extras_tally = [c.get("tally_name", "").strip() or c.get("name", "") for c in chosen]
+        extras_tally = [(c.get("tally_name") or "").strip() or (c.get("name") or "") for c in chosen]
         item_name += " + " + ",".join(extras_tally)
 
     if fittings_selected:
@@ -210,7 +210,7 @@ def generate_mapped_name_and_description(sel, ordered_field_names, chosen, fitti
         item_desc += " + " + fittings_desc
 
     if chosen:
-        extras_desc = [c.get("tally_name", "").strip() or c.get("name", "") for c in chosen]
+        extras_desc = [(c.get("tally_name") or "").strip() or (c.get("name") or "") for c in chosen]
         item_desc += " + Extras: " + ",".join(extras_desc)
 
     return item_name, item_desc
