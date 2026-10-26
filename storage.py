@@ -3,6 +3,99 @@ import os
 
 DATA_FILE = "/data/sku_data.json"
 
+def _insert_after(mapping, after_key, new_key, value):
+    """Return a new dict with new_key placed immediately after after_key."""
+    rebuilt = {}
+    inserted = False
+    for key, item in mapping.items():
+        rebuilt[key] = item
+        if key == after_key:
+            rebuilt[new_key] = value
+            inserted = True
+    if not inserted:
+        rebuilt[new_key] = value
+    return rebuilt
+
+
+def _copied_options(field):
+    """Copy dropdown options, dropping machine-visibility tags."""
+    if isinstance(field, list):
+        raw = field
+    elif isinstance(field, dict):
+        raw = field.get("options") or []
+    else:
+        return []
+
+    options = []
+    for opt in raw:
+        if not isinstance(opt, dict) or opt.get("type") == "text":
+            continue
+        code = str(opt.get("code") or "").strip()
+        if not code:
+            continue
+        options.append({
+            "code": code,
+            "name": opt.get("name", ""),
+            "tally_name": opt.get("tally_name", ""),
+            "description": opt.get("description", ""),
+            "order": opt.get("order", len(options) + 1),
+        })
+    return options
+
+
+def _build_blast_machine_packages(blast_machine):
+    """Category with capacity and certification copied from Blast Machine when present."""
+    source_fields = {}
+    if isinstance(blast_machine, dict):
+        source_fields = blast_machine.get("fields") or {}
+
+    package_codes = ("2A", "2B", "3A", "3B")
+    return {
+        "fields": {
+            "Capacity": {"order": 1, "options": _copied_options(source_fields.get("Capacity"))},
+            "Certification": {"order": 2, "options": _copied_options(source_fields.get("Certification"))},
+            "Helmet": {
+                "order": 3,
+                "options": [
+                    {
+                        "code": "AS",
+                        "name": "Astro",
+                        "tally_name": "AS",
+                        "description": "Astro Helmet",
+                        "order": 1,
+                    },
+                    {
+                        "code": "T6",
+                        "name": "Testa",
+                        "tally_name": "T6",
+                        "description": "Testa Helmet",
+                        "order": 2,
+                    },
+                ],
+            },
+            "Package": {
+                "order": 4,
+                "options": [
+                    {
+                        "code": code,
+                        "name": f"Package {code}",
+                        "tally_name": code,
+                        "description": f"Package {code}",
+                        "order": index,
+                        "contents": "",
+                    }
+                    for index, code in enumerate(package_codes, start=1)
+                ],
+            },
+        },
+        "extras": [],
+        "settings": {
+            "separator": "",
+            "extras_mode": "Multiple",
+            "use_short_codes": False,
+        },
+    }
+
 
 class GithubStorage:
     """
@@ -57,6 +150,14 @@ class GithubStorage:
             except Exception:
                 pass
 
+        # One-time seed: Blast Machine Packages. The flag stays set after the
+        # first run, including when an admin later deletes the category.
+        if self._ensure_blast_machine_packages(data):
+            try:
+                self.save(data)
+            except Exception:
+                pass
+
         return data
 
     @staticmethod
@@ -104,6 +205,26 @@ class GithubStorage:
                     changed = True
 
         return changed
+
+    @staticmethod
+    def _ensure_blast_machine_packages(data):
+        """Insert Blast Machine Packages once. Returns True if data changed."""
+        if data.get("blast_machine_packages_seeded"):
+            return False
+
+        inventory = data.setdefault("inventory", {})
+        if not isinstance(inventory, dict):
+            data["blast_machine_packages_seeded"] = True
+            return True
+
+        if "Blast Machine Packages" not in inventory:
+            category = _build_blast_machine_packages(inventory.get("Blast Machine"))
+            data["inventory"] = _insert_after(
+                inventory, "Blast Machine", "Blast Machine Packages", category
+            )
+
+        data["blast_machine_packages_seeded"] = True
+        return True
 
     def save(self, data):
         """Save configuration data to disk."""

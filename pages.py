@@ -43,7 +43,47 @@ from helpers import (
     parse_fitting_parts,
     get_category_suffix,
     is_text_field,
+    category_uses_short_codes,
 )
+
+
+def _show_option_contents(option):
+    """Show an option's contents note under its selector. Empty notes stay hidden."""
+    contents = (option.get("contents") or "").strip()
+    if not contents:
+        return
+    body = html.escape(contents)
+    st.markdown(
+        '<div class="contents-note">'
+        '<div class="contents-note-label">Contains</div>'
+        f'<div class="contents-note-body">{body}</div>'
+        '</div>',
+        unsafe_allow_html=True,
+    )
+
+
+def _edit_option_contents(cat, field_name, options):
+    """Admin editor for the contents note stored on a dropdown option."""
+    choices = [opt for opt in options if isinstance(opt, dict) and opt.get("code") and opt.get("type") != "text"]
+    if not choices:
+        return
+    with st.expander("Contents note", expanded=False):
+        st.caption("Shown under this option in the configurator. Not included in the item name or description.")
+        labels = [f"{opt.get('code')} - {opt.get('name')}" for opt in choices]
+        picked = st.selectbox(
+            "Option",
+            labels,
+            key=f"contents_pick_{cat}_{field_name}",
+        )
+        picked_opt = choices[labels.index(picked)]
+        note = st.text_area(
+            "Contents",
+            value=picked_opt.get("contents") or "",
+            key=f"contents_note_{cat}_{field_name}_{picked_opt.get('code')}",
+            height=140,
+        )
+        if note.strip() or "contents" in picked_opt:
+            picked_opt["contents"] = note
 
 
 # ==================================================
@@ -144,6 +184,30 @@ def home():
             background: #6b7385;
             align-self: stretch;
         }
+        .contents-note {
+            background: #353a46;
+            border: 1px solid #6b7385;
+            border-radius: 8px;
+            padding: 10px 14px;
+            margin-top: 6px;
+            margin-bottom: 4px;
+            font-family: 'Inter', sans-serif;
+        }
+        .contents-note-label {
+            font-weight: 700;
+            color: #c0c6d0;
+            text-transform: uppercase;
+            font-size: 10px;
+            letter-spacing: 0.5px;
+            margin-bottom: 4px;
+        }
+        .contents-note-body {
+            color: #f3f4f6;
+            font-weight: 500;
+            font-size: 13px;
+            line-height: 1.45;
+            white-space: pre-wrap;
+        }
         </style>
     """, unsafe_allow_html=True)
 
@@ -196,6 +260,7 @@ def home():
                 )
                 sel[mf_name] = {"code": mf_selection["code"], "name": mf_selection["name"], "tally_name": mf_selection.get("tally_name", ""), "description": mf_selection.get("description", "")}
                 selected_machine_code = mf_selection["code"]
+                _show_option_contents(mf_selection)
 
         for f in ordered_fields(fields):
             if f == mf_name:
@@ -243,6 +308,7 @@ def home():
                         label_visibility="collapsed"
                     )
                     sel[f] = {"code": o["code"], "name": o["name"], "tally_name": o.get("tally_name", ""), "description": o.get("description", "")}
+                    _show_option_contents(o)
 
                     if is_fittings and o.get("name", "").lower() != "none":
                         inlet, outlet = parse_fitting_parts(o["name"])
@@ -348,11 +414,18 @@ def home():
                 # Short code: read-only lookup against the saved registry. A code
                 # is only *allocated* on Save; here we just show the existing one
                 # (if this exact configuration was saved before) or a hint.
-                config_signature = compute_config_signature(cat, sel, ordered_fields(fields), chosen)
-                short_code_prefix = get_short_code_prefix(cat, sel, mf_name)
-                existing_short_code = lookup_short_code(
-                    config_signature, st.session_state.get("sku_data", {}).get("short_codes", {})
-                )
+                # Categories with use_short_codes off (Blast Machine Packages)
+                # keep the concatenated SKU and never mint a short code.
+                use_short_codes = category_uses_short_codes(cat_data)
+                config_signature = None
+                short_code_prefix = None
+                existing_short_code = None
+                if use_short_codes:
+                    config_signature = compute_config_signature(cat, sel, ordered_fields(fields), chosen)
+                    short_code_prefix = get_short_code_prefix(cat, sel, mf_name)
+                    existing_short_code = lookup_short_code(
+                        config_signature, st.session_state.get("sku_data", {}).get("short_codes", {})
+                    )
 
                 sq = "\x27"  # single quote for use inside f-string expressions
                 name_card_html = (
@@ -371,20 +444,27 @@ def home():
                     + '<p id="desc-label">Click to Copy</p></div></div>'
                 ) if mapped_desc else '<div style="color: #bbb; font-size: 13px; font-style: italic; padding: 8px 0;">Set Description mappings in Settings</div>'
 
-                if existing_short_code:
-                    short_code_html = (
-                        '<div class="copy-card code-card" onclick="copyText('
-                        + sq + existing_short_code + sq + ", " + sq + "code" + sq
-                        + ')"><div class="text">' + existing_short_code
-                        + '</div><div class="copy-btn"><span id="code-icon" class="material-symbols-outlined">content_copy</span>'
-                        + '<p id="code-label">Click to Copy</p></div></div>'
-                    )
-                else:
-                    short_code_html = (
-                        '<div style="background:#32284a;border:1.5px dashed #8b6fc0;border-radius:10px;'
-                        'padding:12px 16px;color:#d4b8ff;font-size:13px;font-style:italic;">'
-                        'Assigned when you Save to History'
-                        '</div>'
+                short_code_block = ""
+                if use_short_codes:
+                    if existing_short_code:
+                        short_code_html = (
+                            '<div class="copy-card code-card" onclick="copyText('
+                            + sq + existing_short_code + sq + ", " + sq + "code" + sq
+                            + ')"><div class="text">' + existing_short_code
+                            + '</div><div class="copy-btn"><span id="code-icon" class="material-symbols-outlined">content_copy</span>'
+                            + '<p id="code-label">Click to Copy</p></div></div>'
+                        )
+                    else:
+                        short_code_html = (
+                            '<div style="background:#32284a;border:1.5px dashed #8b6fc0;border-radius:10px;'
+                            'padding:12px 16px;color:#d4b8ff;font-size:13px;font-style:italic;">'
+                            'Assigned when you Save to History'
+                            '</div>'
+                        )
+                    short_code_block = (
+                        '<div><div class="section-label">Short Code</div>'
+                        + short_code_html
+                        + '</div>'
                     )
 
                 breakdown_html = "".join(
@@ -459,11 +539,7 @@ def home():
                         </div>
                     </div>
 
-                    <!-- Short Code -->
-                    <div>
-                        <div class="section-label">Short Code</div>
-                        {short_code_html}
-                    </div>
+                    {short_code_block}
 
                     {'<!-- Item Name --><div><div class="section-label">Item Name</div>' + name_card_html + '</div>' if cat != "Blast Machine" else ''}
 
@@ -502,6 +578,8 @@ def home():
                 card_height = 320 + (total_items * 30) + 90
                 if cat == "Blast Machine":
                     card_height -= 88
+                if not use_short_codes:
+                    card_height -= 96
                 if mapped_desc and len(mapped_desc) > 80:
                     card_height += 30
                 if mapped_name and len(mapped_name) > 80:
@@ -525,9 +603,12 @@ def home():
                         mapped_name=mapped_name,
                         mapped_desc=mapped_desc,
                         breakdown_items=all_breakdown_items,
-                        signature=config_signature,
-                        prefix=short_code_prefix,
+                        signature=config_signature if use_short_codes else None,
+                        prefix=short_code_prefix if use_short_codes else None,
                     )
+                    if not use_short_codes:
+                        st.toast(f"Saved: {sku}")
+                        st.rerun()
                     saved_code = lookup_short_code(
                         config_signature,
                         st.session_state.get("sku_data", {}).get("short_codes", {}),
@@ -830,6 +911,7 @@ def admin():
                         }
                     )
                     fields[field_for_options]["options"] = merge_editor_records(opts, edited_df.to_dict("records"))
+                    _edit_option_contents(cat, field_for_options, fields[field_for_options]["options"])
             else:
                 st.caption("Choose a tool above to reorder, rename, or edit field options.")
         else:
@@ -902,9 +984,19 @@ def admin():
             settings["extras_mode"] = extras_mode_setting
             cat_data["settings"] = settings
 
+        st.markdown("##### Short Codes")
+        settings["use_short_codes"] = st.checkbox(
+            "Assign short codes",
+            value=bool(settings.get("use_short_codes", True)),
+            help="When off, Save to History stores the SKU only. Blast Machine Packages leaves this off because the code is already short.",
+            key=f"use_short_codes_{cat}",
+        )
+        cat_data["settings"] = settings
+
         with st.expander("📋 Current Settings Preview", expanded=False):
             st.write(f"**Separator:** `{settings.get('separator', DEFAULT_SEPARATOR)}`")
             st.write(f"**Extras Mode:** {settings.get('extras_mode', DEFAULT_EXTRAS_MODE)}")
+            st.write(f"**Short codes:** {'On' if settings.get('use_short_codes', True) else 'Off'}")
             if settings.get('extras_mode', DEFAULT_EXTRAS_MODE) == "Single":
                 st.info("ℹ️ Users will see radio buttons to select one extra at a time")
             else:

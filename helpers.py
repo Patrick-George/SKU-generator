@@ -14,7 +14,7 @@ DEFAULT_EXTRAS_MODE = "Multiple"
 EXTRAS_PER_PAGE = 8
 MAX_SKU_HISTORY = 50
 
-HISTORY_CATEGORY_ORDER = ["Blast Machine", "Air Receiver", "Hose"]
+HISTORY_CATEGORY_ORDER = ["Blast Machine", "Blast Machine Packages", "Air Receiver", "Hose"]
 
 # Per-category suffix appended to every generated SKU. Used to encode
 # manufacturer/source identity that doesn't vary across configurations
@@ -271,6 +271,17 @@ def is_text_field(field_data):
 def get_machine_field(cat_data):
     """Return the name of the machine-selector field for a category."""
     return cat_data.get("settings", {}).get("machine_field", "Machine")
+
+
+def category_uses_short_codes(cat_data):
+    """Return whether this category allocates short codes.
+
+    A missing setting means on, so categories that predate the flag are unchanged.
+    """
+    settings = {}
+    if isinstance(cat_data, dict):
+        settings = cat_data.get("settings") or {}
+    return bool(settings.get("use_short_codes", True))
 
 
 def filter_for_machine(items, machine_code):
