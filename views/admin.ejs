@@ -1,0 +1,268 @@
+<%- include('partials/head') %>
+<h1 class="page-title">Admin Settings</h1>
+<p class="page-sub">Changes save to the data file immediately.</p>
+<form method="get" action="/admin" class="row">
+  <input type="hidden" name="section" value="<%= section %>">
+  <select class="grow" name="cat" onchange="this.form.submit()">
+    <% if (!categories.length) { %><option value="">No categories yet</option><% } %>
+    <% categories.forEach((name) => { %><option value="<%= name %>" <%= name === cat ? 'selected' : '' %>><%= name %></option><% }) %>
+  </select>
+  <input name="newCategory" placeholder="New category">
+  <button class="primary" type="submit" formaction="/admin/category" formmethod="post">Add</button>
+</form>
+<% if (cat) { %>
+  <form method="post" action="/admin/category/delete" onsubmit="return confirm('Delete <%= cat %>? This cannot be undone.');" style="margin: 10px 0 16px;">
+    <input type="hidden" name="cat" value="<%= cat %>">
+    <button class="danger" type="submit">Delete category</button>
+  </form>
+  <div class="tabs">
+    <% sections.forEach(([id, label]) => { %>
+      <a class="btn <%= id === section ? 'primary' : '' %>" href="/admin?cat=<%= encodeURIComponent(cat) %>&section=<%= id %>"><%= label %></a>
+    <% }) %>
+  </div>
+
+  <% if (section === 'fields') { %>
+    <form method="post" action="/admin/field" class="row">
+      <input type="hidden" name="cat" value="<%= cat %>">
+      <input class="grow" name="name" placeholder="Field name" required>
+      <select name="type" style="max-width:220px">
+        <option>Dropdown</option>
+        <option>Text Input</option>
+        <option>Multi-line Text</option>
+      </select>
+      <button class="primary" type="submit">Add field</button>
+    </form>
+    <% if (!fieldOrder.length) { %>
+      <div class="banner info">No fields yet.</div>
+    <% } else { %>
+      <div class="tabs">
+        <% ['reorder','rename','options'].forEach((id) => { %>
+          <a class="btn <%= tool === id ? 'primary' : '' %>" href="/admin?cat=<%= encodeURIComponent(cat) %>&section=fields&tool=<%= id %>&field=<%= encodeURIComponent(field || '') %>"><%= id === 'reorder' ? 'Reorder' : id === 'rename' ? 'Rename / Delete' : 'Edit options' %></a>
+        <% }) %>
+      </div>
+      <% if (tool === 'reorder') { %>
+        <% fieldOrder.forEach((name, i) => { %>
+          <div class="row" style="margin-bottom:8px;">
+            <span class="grow"><%= i + 1 %>. <%= name %></span>
+            <form method="post" action="/admin/field/move"><input type="hidden" name="cat" value="<%= cat %>"><input type="hidden" name="field" value="<%= name %>"><input type="hidden" name="dir" value="up"><button <%= i === 0 ? 'disabled' : '' %>>↑</button></form>
+            <form method="post" action="/admin/field/move"><input type="hidden" name="cat" value="<%= cat %>"><input type="hidden" name="field" value="<%= name %>"><input type="hidden" name="dir" value="down"><button <%= i === fieldOrder.length - 1 ? 'disabled' : '' %>>↓</button></form>
+          </div>
+        <% }) %>
+      <% } else if (tool === 'rename') { %>
+        <form method="post" action="/admin/field/rename">
+          <input type="hidden" name="cat" value="<%= cat %>">
+          <label class="field"><span class="k">Field</span>
+            <select name="field"><% fieldOrder.forEach((name) => { %><option <%= name === field ? 'selected' : '' %>><%= name %></option><% }) %></select>
+          </label>
+          <label class="field"><span class="k">New name</span><input name="newName" value="<%= field %>"></label>
+          <div class="row">
+            <button class="primary" type="submit">Rename</button>
+            <button class="danger" type="submit" formaction="/admin/field/delete" onclick="return confirm('Delete this field?');">Delete</button>
+          </div>
+        </form>
+      <% } else if (fieldData && fieldData.text) { %>
+        <form method="get" action="/admin">
+          <input type="hidden" name="cat" value="<%= cat %>"><input type="hidden" name="section" value="fields"><input type="hidden" name="tool" value="options">
+          <select name="field" onchange="this.form.submit()"><% fieldOrder.forEach((name) => { %><option <%= name === field ? 'selected' : '' %>><%= name %></option><% }) %></select>
+        </form>
+        <div class="banner info">This is a text field. Users type a value; it is not part of the SKU code.</div>
+        <form method="post" action="/admin/field/multiline">
+          <input type="hidden" name="cat" value="<%= cat %>"><input type="hidden" name="field" value="<%= field %>">
+          <label><input type="checkbox" name="multiline" value="1" style="width:auto" <%= fieldData.multiline ? 'checked' : '' %>> Multi-line input</label>
+          <p><button class="primary" type="submit">Save field type</button></p>
+        </form>
+      <% } else if (field) { %>
+        <form method="get" action="/admin" style="margin-bottom:10px;">
+          <input type="hidden" name="cat" value="<%= cat %>"><input type="hidden" name="section" value="fields"><input type="hidden" name="tool" value="options">
+          <select name="field" onchange="this.form.submit()"><% fieldOrder.forEach((name) => { %><option <%= name === field ? 'selected' : '' %>><%= name %></option><% }) %></select>
+        </form>
+        <% if (hasX) { %><div class="banner warn">An option uses the code X, which also marks the start of extras. Prefer a code like NA or NF.</div><% } %>
+        <form method="post" action="/admin/options">
+          <input type="hidden" name="cat" value="<%= cat %>"><input type="hidden" name="field" value="<%= field %>">
+          <table id="options" data-remove-row>
+            <thead><tr><th>Code</th><th>Name</th><th>Tally Name</th><th>Description</th><th>Order</th><th></th></tr></thead>
+            <tbody>
+              <% options.forEach((opt) => { %>
+                <tr>
+                  <td><input name="code" value="<%= opt.code || '' %>"></td>
+                  <td><input name="name" value="<%= opt.name || '' %>"></td>
+                  <td><input name="tally_name" value="<%= opt.tally_name || '' %>"></td>
+                  <td><input name="description" value="<%= opt.description || '' %>"></td>
+                  <td><input name="order" value="<%= opt.order ?? '' %>"></td>
+                  <td><button type="button" data-remove>✕</button></td>
+                </tr>
+              <% }) %>
+              <% if (!options.length) { %>
+                <tr>
+                  <td><input name="code"></td><td><input name="name"></td><td><input name="tally_name"></td><td><input name="description"></td><td><input name="order" value="1"></td><td><button type="button" data-remove>✕</button></td>
+                </tr>
+              <% } %>
+            </tbody>
+          </table>
+          <p class="tools">
+            <button type="button" data-add-row="#options">Add row</button>
+            <button class="primary" type="submit">Save options</button>
+          </p>
+        </form>
+      <% } %>
+    <% } %>
+
+  <% } else if (section === 'extras') { %>
+    <p class="muted"><%= extras.length %> extras.</p>
+    <form method="post" action="/admin/extras">
+      <input type="hidden" name="cat" value="<%= cat %>">
+      <table id="extras" data-remove-row>
+        <thead><tr><th>Code</th><th>Name</th><th>Tally Name</th><th>Description</th><th>Order</th><th></th></tr></thead>
+        <tbody>
+          <% extras.forEach((opt) => { %>
+            <tr>
+              <td><input name="code" value="<%= opt.code || '' %>"></td>
+              <td><input name="name" value="<%= opt.name || '' %>"></td>
+              <td><input name="tally_name" value="<%= opt.tally_name || '' %>"></td>
+              <td><input name="description" value="<%= opt.description || '' %>"></td>
+              <td><input name="order" value="<%= opt.order ?? '' %>"></td>
+              <td><button type="button" data-remove>✕</button></td>
+            </tr>
+          <% }) %>
+          <% if (!extras.length) { %>
+            <tr><td><input name="code"></td><td><input name="name"></td><td><input name="tally_name"></td><td><input name="description"></td><td><input name="order" value="1"></td><td><button type="button" data-remove>✕</button></td></tr>
+          <% } %>
+        </tbody>
+      </table>
+      <p class="tools"><button type="button" data-add-row="#extras">Add row</button><button class="primary" type="submit">Save extras</button></p>
+    </form>
+
+  <% } else if (section === 'settings') { %>
+    <form method="post" action="/admin/settings">
+      <input type="hidden" name="cat" value="<%= cat %>">
+      <label class="field"><span class="k">SKU separator</span><input name="separator" maxlength="5" value="<%= settings.separator || '' %>" placeholder="Leave empty for no separator"></label>
+      <span class="k">Extras selection</span>
+      <label><input style="width:auto" type="radio" name="extras_mode" value="Single" <%= settings.extras_mode === 'Single' ? 'checked' : '' %>> Single — one extra, shown as radio buttons</label>
+      <label><input style="width:auto" type="radio" name="extras_mode" value="Multiple" <%= settings.extras_mode !== 'Single' ? 'checked' : '' %>> Multiple — any extras, shown as checkboxes</label>
+      <p><button class="primary" type="submit">Save settings</button></p>
+    </form>
+    <div class="banner info">
+      <p><span class="k">Separator</span><%= settings.separator ? settings.separator : 'None' %></p>
+      <p><span class="k">Extras mode</span><%= settings.extras_mode === 'Single' ? 'Single' : 'Multiple' %></p>
+      <p><%= settings.extras_mode === 'Single' ? 'Users see radio buttons and can select one extra.' : 'Users see checkboxes and can select several extras.' %></p>
+    </div>
+
+  <% } else if (section === 'matrix') { %>
+    <% if (!matrix.total) { %>
+      <div class="banner warn">No dropdown fields to combine. Text fields are excluded.</div>
+    <% } else { %>
+      <div class="banner info">This category has <%= matrix.total.toLocaleString("en-IN") %> SKU combinations.</div>
+      <% if (matrix.total > 100000) { %>
+        <div class="banner warn">That is too large to export in one file. Hose and Air Receiver can be exported; Blast Machine cannot.</div>
+      <% } else { %>
+        <p><a class="btn primary" href="/admin/matrix.csv?cat=<%= encodeURIComponent(cat) %>">Download CSV</a></p>
+      <% } %>
+      <table>
+        <thead><tr><% matrix.headers.forEach((h) => { %><th><%= h %></th><% }) %></tr></thead>
+        <tbody>
+          <% matrix.preview.forEach((row) => { %><tr><% matrix.headers.forEach((h) => { %><td><%= row[h] %></td><% }) %></tr><% }) %>
+        </tbody>
+      </table>
+      <p class="muted">Showing the first <%= matrix.preview.length %> rows.</p>
+    <% } %>
+
+  <% } else if (section === 'backup') { %>
+    <div class="layout">
+      <div>
+        <h2>Export</h2>
+        <p>Downloads categories, history, short codes, and counters. <%= categoryCount %> categories in the database.</p>
+        <a class="btn primary" href="/admin/backup.json">Download backup (JSON)</a>
+      </div>
+      <div>
+        <h2>Import</h2>
+        <% if (importPreview) { %>
+          <div class="banner ok">Valid backup: <%= importPreview.count %> categories<% if (importPreview.fileName) { %> in <%= importPreview.fileName %><% } %>.</div>
+          <details class="history" open>
+            <summary>Preview categories</summary>
+            <ul>
+              <% importPreview.categories.forEach((row) => { %>
+                <li><strong><%= row.name %></strong>: <%= row.fields %> fields, <%= row.extras %> extras</li>
+              <% }) %>
+            </ul>
+          </details>
+          <form method="post" action="/admin/import/confirm">
+            <label><input style="width:auto" type="radio" name="mode" value="replace" checked> Replace everything</label>
+            <label><input style="width:auto" type="radio" name="mode" value="merge"> Merge new categories only</label>
+            <div class="banner warn">This replaces or merges the live database and cannot be undone. Download a backup first.</div>
+            <p class="tools">
+              <button class="primary" type="submit">Import database</button>
+            </p>
+          </form>
+          <form method="post" action="/admin/import/cancel"><button type="submit">Cancel</button></form>
+        <% } %>
+        <form method="post" action="/admin/import" enctype="multipart/form-data">
+          <label class="field"><span class="k">Backup file</span><input type="file" name="backup" accept="application/json,.json" required></label>
+          <p><button class="primary" type="submit"><%= importPreview ? 'Preview a different file' : 'Preview backup' %></button></p>
+        </form>
+      </div>
+    </div>
+
+  <% } else if (section === 'mapping') { %>
+    <% if (!fieldOrder.length) { %>
+      <div class="banner warn">Add fields first.</div>
+    <% } else { %>
+      <form method="post" action="/admin/machine-field" class="row">
+        <input type="hidden" name="cat" value="<%= cat %>">
+        <label class="grow"><span class="k">Machine selector field</span>
+          <select name="machineField"><% fieldOrder.forEach((name) => { %><option <%= name === machineField ? 'selected' : '' %>><%= name %></option><% }) %></select>
+        </label>
+        <button class="primary" type="submit">Save</button>
+      </form>
+      <% if (!machines.length) { %>
+        <div class="banner info">Add options to the machine field first.</div>
+      <% } else { %>
+        <form method="get" action="/admin">
+          <input type="hidden" name="cat" value="<%= cat %>"><input type="hidden" name="section" value="mapping"><input type="hidden" name="detail" value="<%= detail %>">
+          <label class="field"><span class="k">Configure mapping for machine</span>
+            <select name="machine" onchange="this.form.submit()">
+              <% machines.forEach((m) => { %><option value="<%= m.code %>" <%= m.code === machine ? 'selected' : '' %>><%= m.code %> - <%= m.name %></option><% }) %>
+            </select>
+          </label>
+        </form>
+        <div class="tabs">
+          <% ['fields','options','extras'].forEach((id) => { %>
+            <a class="btn <%= detail === id ? 'primary' : '' %>" href="/admin?cat=<%= encodeURIComponent(cat) %>&section=mapping&machine=<%= encodeURIComponent(machine) %>&detail=<%= id %>"><%= id === 'fields' ? 'Field visibility' : id === 'options' ? 'Option visibility' : 'Extras visibility' %></a>
+          <% }) %>
+        </div>
+        <form method="post" action="/admin/mapping">
+          <input type="hidden" name="cat" value="<%= cat %>">
+          <input type="hidden" name="machine" value="<%= machine %>">
+          <input type="hidden" name="detail" value="<%= detail %>">
+          <h3>Field visibility</h3>
+          <p class="muted">Checked fields are shown when this machine is selected.</p>
+          <div class="checks">
+            <% otherFields.forEach((f) => { %>
+              <label><input type="checkbox" name="visibleField" value="<%= f.name %>" <%= f.on ? 'checked' : '' %>> <%= f.name %></label>
+            <% }) %>
+          </div>
+          <% if (detail === 'options') { %>
+            <h3>Option visibility</h3>
+            <% optionGroups.forEach((group) => { %>
+              <h4><%= group.name %></h4>
+              <div class="checks">
+                <% group.options.forEach((opt) => { %>
+                  <label><input type="checkbox" name="visibleOpt" value="<%= opt.key %>" <%= opt.on ? 'checked' : '' %>> <%= opt.code %> - <%= opt.name %></label>
+                <% }) %>
+              </div>
+            <% }) %>
+          <% } else if (detail === 'extras') { %>
+            <h3>Extras visibility</h3>
+            <% if (!extraMaps.length) { %><div class="banner info">No extras configured.</div><% } %>
+            <div class="checks">
+              <% extraMaps.forEach((extra) => { %>
+                <label><input type="checkbox" name="visibleExtra" value="<%= extra.index %>" <%= extra.on ? 'checked' : '' %>> <%= extra.code %> - <%= extra.name %></label>
+              <% }) %>
+            </div>
+          <% } %>
+          <p><button class="primary" type="submit">Save mapping</button></p>
+        </form>
+      <% } %>
+    <% } %>
+  <% } %>
+<% } %>
+<%- include('partials/foot') %>

@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title><%= title %> · Blastline SKU</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/app.css?v=2">
+</head>
+<body>
+<div class="shell">
+  <aside class="nav">
+    <div class="brand">
+      <img src="/blastline_logo.png" alt="Blastline">
+      <span><strong>Blastline</strong><br><span class="muted">SKU Configurator</span></span>
+    </div>
+    <p class="nav-label">Navigation</p>
+    <a class="item <%= page === 'home' ? 'active' : '' %>" href="/">SKU Generator</a>
+    <a class="item <%= page === 'history' ? 'active' : '' %>" href="/history">SKU History</a>
+    <a class="item <%= page === 'decoder' ? 'active' : '' %>" href="/decoder">SKU Decoder</a>
+    <a class="item <%= page === 'categories' ? 'active' : '' %>" href="/category-items">Category - Item Pairs</a>
+    <hr>
+    <% if (admin) { %>
+      <a class="item <%= page === 'admin' ? 'active' : '' %>" href="/admin">Settings</a>
+      <form method="post" action="/logout"><button class="item" type="submit">Log out</button></form>
+    <% } else { %>
+      <a class="item <%= page === 'login' ? 'active' : '' %>" href="/login">Settings</a>
+    <% } %>
+  </aside>
+  <main>
+    <div class="page">
+    <% if (flash) { %>
+      <div class="banner <%= flash.type %>"><%= flash.text %></div>
+    <% } %>

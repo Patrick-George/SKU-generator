@@ -1,0 +1,61 @@
+<%- include('partials/head') %>
+<h1 class="page-title">SKU Decoder</h1>
+<p class="page-sub">Enter a SKU or a short code such as BL-003</p>
+<form method="get" action="/decoder" class="center-narrow">
+  <input name="q" value="<%= q %>" placeholder="e.g. BL20MSF0 or BL-003" autofocus>
+  <p><button class="primary" type="submit" style="width:100%">Decode</button></p>
+</form>
+<% if (q) { %>
+  <section class="panel result">
+  <h2>Decoding: <span class="chip"><%= q %></span></h2>
+  <% if (shortRec) { %>
+    <div class="banner ok">Short code <%= shortRec.code %> — <%= shortRec.category || '' %></div>
+    <% if (shortRec.sku) { %>
+      <span class="k">Full SKU</span>
+      <button type="button" class="copy-card sku-card" data-copy="<%= shortRec.sku %>"><span class="text"><%= shortRec.sku %></span><small>Copy</small></button>
+    <% } %>
+    <% if (shortRec.mapped_name) { %>
+      <span class="k">Item Name</span>
+      <div class="copy-card name-card"><span class="text"><%= shortRec.mapped_name %></span></div>
+    <% } %>
+    <% if (shortRec.mapped_desc) { %>
+      <span class="k">Item Description</span>
+      <div class="copy-card desc-card"><span class="text"><%= shortRec.mapped_desc %></span></div>
+    <% } %>
+    <% if (shortRec.breakdown_items && shortRec.breakdown_items.length) { %>
+      <h3>Component breakdown</h3>
+      <% shortRec.breakdown_items.forEach((part) => { %>
+        <div class="breakdown-row"><span style="min-width:140px"><%= part.field || 'Extra' %></span><span class="chip"><%= part.code %></span> <%= part.name %></div>
+      <% }) %>
+    <% } %>
+  <% } else if (!best) { %>
+    <div class="banner err">Could not decode this SKU. It may not match any configured category.</div>
+  <% } else { %>
+    <div class="banner ok">Category matched: <%= best.category %></div>
+    <% if (matchedCode) { %><div class="banner info">Short code: <%= matchedCode %></div><% } %>
+    <% if (itemName || itemDesc) { %>
+      <% if (itemName) { %><span class="k">Item Name</span><div class="copy-card name-card"><span class="text"><%= itemName %></span></div><% } %>
+      <% if (itemDesc) { %><span class="k">Item Description</span><div class="copy-card desc-card"><span class="text"><%= itemDesc %></span></div><% } %>
+    <% } else { %>
+      <div class="banner info">Item name and description could not be built. Check that Tally Name and Description mappings are set for this category.</div>
+    <% } %>
+    <h3>Component breakdown</h3>
+    <% best.parts.forEach((part) => { %>
+      <div class="breakdown-row"><span style="min-width:140px"><%= part.field %></span><span class="chip"><%= part.code %></span> <%= part.name %></div>
+    <% }) %>
+    <% if (best.extras && best.extras.length) { %>
+      <h3>Extras</h3>
+      <% best.extras.forEach((extra) => { %>
+        <div class="breakdown-row"><span style="min-width:140px">Extra</span><span class="chip"><%= extra.code %></span> <%= extra.name %></div>
+      <% }) %>
+    <% } %>
+    <% if (best.remaining) { %><div class="banner warn">Unmatched portion: <%= best.remaining %></div><% } %>
+    <% if (others.length) { %>
+      <details class="history"><summary>Other possible matches (<%= others.length %>)</summary>
+        <% others.forEach((other) => { %><p><strong><%= other.category %></strong> — <%= other.parts.length %> fields, leftover <%= other.remaining || '—' %></p><% }) %>
+      </details>
+    <% } %>
+  <% } %>
+  </section>
+<% } %>
+<%- include('partials/foot') %>

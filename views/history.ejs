@@ -1,0 +1,84 @@
+<%- include('partials/head') %>
+<h1 class="page-title">SKU History</h1>
+<p class="page-sub">Saved configurations, short codes, and item descriptions</p>
+<% if (!history.length) { %>
+  <div class="banner info">No saved SKUs yet.</div>
+  <p style="text-align:center"><a class="btn" href="/">Go to SKU Generator</a></p>
+<% } else { %>
+  <form method="get" action="/history" class="filters">
+    <input class="grow" name="q" value="<%= query %>" placeholder="Search SKU, short code, client, machine">
+    <select name="filter" onchange="this.form.submit()">
+      <% filters.forEach(([label, key]) => { %><option value="<%= key %>" <%= key === filterKey ? 'selected' : '' %>><%= label %></option><% }) %>
+    </select>
+    <select name="group" onchange="this.form.submit()">
+      <% [['Recent','recent'],['Client','client'],['Machine','machine']].forEach(([label, key]) => { %>
+        <option value="<%= key %>" <%= key === groupBy ? 'selected' : '' %>><%= label %></option>
+      <% }) %>
+    </select>
+    <button type="submit">Search</button>
+  </form>
+  <div class="tools">
+    <a class="btn primary" href="/history/export.xlsx?q=<%= encodeURIComponent(query) %>&filter=<%= encodeURIComponent(filterKey) %>&group=<%= encodeURIComponent(groupBy) %>">Download Excel (<%= filtered.length %>)</a>
+    <form method="post" action="/history/clear" onsubmit="return confirm('Clear all history? Short codes stay assigned.');">
+      <button type="submit">Clear all history</button>
+    </form>
+  </div>
+  <p class="muted">Showing <%= filtered.length %> of <%= history.length %> saved SKUs<% if (cbmCount) { %> · <%= cbmCount %> custom (CBM)<% } %></p>
+  <div class="history">
+    <% if (!sections.length) { %><div class="banner info">No SKUs match your search or filter.</div><% } %>
+    <% sections.forEach(([title, entries]) => { %>
+      <% if (groupBy !== 'recent') { %><h2><%= title %> <span class="muted">· <%= entries.length %></span></h2><% } %>
+      <% entries.forEach((entry) => { %>
+        <details>
+          <summary><%= entry.label %></summary>
+          <div class="detail-body">
+          <div class="tools">
+            <button type="button" class="copy-card sku-card" data-copy="<%= entry.sku %>" style="width:auto"><span class="text"><%= entry.sku %></span><small>Copy SKU</small></button>
+            <% if (entry.short_code) { %>
+              <button type="button" class="copy-card code-card" data-copy="<%= entry.short_code %>" style="width:auto"><span class="text"><%= entry.short_code %></span><small>Copy code</small></button>
+            <% } %>
+          </div>
+          <% if (entry.clientLabel) { %><p><span class="k">Client</span><strong><%= entry.clientLabel %></strong></p><% } %>
+          <% if (entry.dateStr) { %><p class="muted"><%= entry.dateStr %><% if (entry.timeStr) { %> · <%= entry.timeStr %> IST<% } %></p><% } %>
+          <% if (entry.mappedName && entry.category !== 'Blast Machine') { %>
+            <span class="k">Item Name</span>
+            <div class="copy-card name-card" style="margin-bottom:10px"><span class="text"><%= entry.mappedName %></span></div>
+          <% } %>
+          <% if (entry.mappedDesc) { %>
+            <span class="k">Item Description</span>
+            <div class="copy-card desc-card" style="margin-bottom:10px"><span class="text"><%= entry.mappedDesc %></span></div>
+          <% } %>
+          <% if (entry.config && Object.keys(entry.config).length) { %>
+            <span class="k">Configuration</span>
+            <% Object.entries(entry.config).forEach(([name, val]) => { %>
+              <div class="breakdown-row">
+                <span style="min-width:160px;color:var(--label)"><%= name %></span>
+                <% if (!(val && val.is_text) && val && val.code) { %><span class="chip"><%= val.code %></span><% } %>
+                <span style="white-space:pre-wrap"><%= (val && val.name) || '' %></span>
+              </div>
+            <% }) %>
+          <% } %>
+          <% if (entry.extras && entry.extras.length) { %>
+            <span class="k">Extras</span>
+            <% entry.extras.forEach((extra) => { %>
+              <div class="breakdown-row"><span class="chip"><%= extra.code %></span> <%= extra.name %></div>
+            <% }) %>
+          <% } %>
+          <% if (entry.breakdown && entry.breakdown.length) { %>
+            <span class="k">SKU Breakdown</span>
+            <% entry.breakdown.forEach((item) => { %>
+              <div class="breakdown-row">
+                <span class="chip"><%= item.code || '' %></span>
+                <span><% if (item.field) { %><%= item.field %>: <% } %><%= item.name || '' %></span>
+              </div>
+            <% }) %>
+          <% } else if (!entry.config || !Object.keys(entry.config).length) { %>
+            <p class="muted">Configuration snapshot not available for this entry.</p>
+          <% } %>
+          </div>
+        </details>
+      <% }) %>
+    <% }) %>
+  </div>
+<% } %>
+<%- include('partials/foot') %>

@@ -1,0 +1,10 @@
+<%- include('partials/head') %>
+<h1 class="page-title">Admin Login</h1>
+<form method="post" action="/login" class="center-narrow">
+  <label class="field"><span class="k">Password</span><input type="password" name="password" autofocus></label>
+  <div class="row">
+    <button class="primary grow" type="submit">Login</button>
+    <a class="btn grow" href="/">Cancel</a>
+  </div>
+</form>
+<%- include('partials/foot') %>

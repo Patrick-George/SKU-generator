@@ -1,0 +1,106 @@
+<%- include('partials/head') %>
+<h1 class="page-title">Blastline SKU Configurator</h1>
+<p class="page-sub">Configure product specifications and generate SKU codes</p>
+<% if (!model) { %>
+  <div class="banner warn">No categories available. Add categories in Settings.</div>
+<% } else { %>
+  <% if (notice) { %><div class="banner <%= notice.type %>"><%= notice.text %></div><% } %>
+  <form method="get" action="/">
+    <div class="category-pick">
+      <span class="k">Product category</span>
+      <select name="category" onchange="this.form.submit()">
+        <% model.categories.forEach((cat) => { %>
+          <option value="<%= cat %>" <%= cat === model.category ? 'selected' : '' %>><%= cat %></option>
+        <% }) %>
+      </select>
+    </div>
+    <div class="layout">
+      <section class="panel">
+        <p class="subhead">Configuration</p>
+        <% model.widgets.forEach((w) => { %>
+          <label class="field">
+            <span class="k"><%= w.name %></span>
+            <% if (w.kind === 'machine') { %>
+              <select name="machine" onchange="this.form.submit()">
+                <% w.options.forEach((o) => { %><option value="<%= o.code %>" <%= o.code === w.value ? 'selected' : '' %>><%= o.label %></option><% }) %>
+              </select>
+            <% } else if (w.kind === 'text') { %>
+              <input name="txt_<%= w.name %>" value="<%= w.value %>" placeholder="Enter <%= w.name %>" onchange="this.form.submit()">
+            <% } else if (w.kind === 'textarea') { %>
+              <textarea name="txt_<%= w.name %>" placeholder="Enter <%= w.name %>" onchange="this.form.submit()"><%= w.value %></textarea>
+            <% } else { %>
+              <select name="opt_<%= w.name %>" onchange="this.form.submit()">
+                <% w.options.forEach((o) => { %><option value="<%= o.code %>" <%= o.code === w.value ? 'selected' : '' %>><%= o.label %></option><% }) %>
+              </select>
+              <% if (w.inlet || w.outlet) { %>
+                <div class="fit">
+                  <% if (w.inlet) { %><div><b>Inlet</b><%= w.inlet %></div><% } %>
+                  <% if (w.outlet) { %><div><b>Outlet</b><%= w.outlet %></div><% } %>
+                </div>
+              <% } %>
+            <% } %>
+          </label>
+        <% }) %>
+        <p class="subhead">Extras</p>
+        <% if (!model.visibleExtras.length) { %>
+          <div class="banner info">No extras available for this selection.</div>
+        <% } else if (model.extrasMode === 'Single') { %>
+          <div class="choices">
+            <label><input type="radio" name="extra_single" value="None" <%= model.singleExtra === 'None' ? 'checked' : '' %> onchange="this.form.submit()"> None</label>
+            <% model.visibleExtras.forEach((e) => { %>
+              <label><input type="radio" name="extra_single" value="<%= e.name %>" <%= model.singleExtra === e.name ? 'checked' : '' %> onchange="this.form.submit()"> <%= e.name %></label>
+            <% }) %>
+          </div>
+        <% } else { %>
+          <div class="extras">
+            <% model.visibleExtras.forEach((e) => { %>
+              <label><input type="checkbox" name="extra" value="<%= e.code %>" <%= model.chosenCodes.has(e.code) ? 'checked' : '' %> onchange="this.form.submit()"> <%= e.name %></label>
+            <% }) %>
+          </div>
+        <% } %>
+      </section>
+      <section class="panel output">
+        <% if (model.sku) { %>
+          <div class="cards">
+            <div>
+              <span class="k">Generated SKU</span>
+              <button type="button" class="copy-card sku-card" data-copy="<%= model.sku %>"><span class="text"><%= model.sku %></span><small>Click to copy</small></button>
+            </div>
+            <div>
+              <span class="k">Short Code</span>
+              <% if (model.existingShortCode) { %>
+                <button type="button" class="copy-card code-card" data-copy="<%= model.existingShortCode %>"><span class="text"><%= model.existingShortCode %></span><small>Click to copy</small></button>
+              <% } else { %>
+                <div class="pending">Assigned when you save to history</div>
+              <% } %>
+            </div>
+            <% if (model.showItemName) { %>
+              <div>
+                <span class="k">Item Name</span>
+                <% if (model.mappedName) { %>
+                  <button type="button" class="copy-card name-card" data-copy="<%= model.mappedName %>"><span class="text"><%= model.mappedName %></span><small>Click to copy</small></button>
+                <% } else { %><div class="muted">Set Tally Name mappings in Settings</div><% } %>
+              </div>
+            <% } %>
+            <div>
+              <span class="k">Item Description</span>
+              <% if (model.mappedDesc) { %>
+                <button type="button" class="copy-card desc-card" data-copy="<%= model.mappedDesc %>"><span class="text"><%= model.mappedDesc %></span><small>Click to copy</small></button>
+              <% } else { %><div class="muted">Set Description mappings in Settings</div><% } %>
+            </div>
+            <div class="breakdown">
+              <span class="k">SKU Breakdown</span>
+              <% model.allBreakdown.forEach((item) => { %>
+                <div class="breakdown-row"><span class="chip"><%= item.code %></span> <%= item.name %></div>
+              <% }) %>
+            </div>
+          </div>
+          <button class="primary save" type="submit" formaction="/save" formmethod="post">Save to History</button>
+        <% } else { %>
+          <div class="banner info">Select a configuration to generate a SKU.</div>
+        <% } %>
+      </section>
+    </div>
+  </form>
+<% } %>
+<%- include('partials/foot') %>
