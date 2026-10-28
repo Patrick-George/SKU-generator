@@ -48,42 +48,72 @@ from helpers import (
 
 
 def _show_option_contents(option):
-    """Show an option's contents note under its selector. Empty notes stay hidden."""
+    """Show an option's selector note under its dropdown. Empty notes stay hidden."""
     contents = (option.get("contents") or "").strip()
     if not contents:
         return
-    body = html.escape(contents)
+    lines = [line.strip() for line in contents.splitlines() if line.strip()]
+    if len(lines) > 1:
+        items = "".join(f"<li>{html.escape(line)}</li>" for line in lines)
+        body = f"<ul class='contents-note-list'>{items}</ul>"
+    else:
+        body = f"<div class='contents-note-body'>{html.escape(contents)}</div>"
     st.markdown(
         '<div class="contents-note">'
         '<div class="contents-note-label">Contains</div>'
-        f'<div class="contents-note-body">{body}</div>'
-        '</div>',
+        f"{body}"
+        "</div>",
         unsafe_allow_html=True,
     )
 
 
-def _edit_option_contents(cat, field_name, options):
-    """Admin editor for the contents note stored on a dropdown option."""
-    choices = [opt for opt in options if isinstance(opt, dict) and opt.get("code") and opt.get("type") != "text"]
-    if not choices:
+def _selector_info_section(cat, cat_data):
+    """Admin editor for notes shown under a dropdown. Not part of the item description."""
+    normalize_fields(cat_data)
+    fields = cat_data["fields"]
+    dropdowns = [
+        name for name in ordered_fields(fields)
+        if not is_text_field(fields[name]) and fields[name].get("options")
+    ]
+    st.caption(
+        "Shown under the selected option in the configurator. "
+        "Not included in the item name or description. One item per line."
+    )
+    if not dropdowns:
+        st.info("This category has no dropdown fields yet.")
         return
-    with st.expander("Contents note", expanded=False):
-        st.caption("Shown under this option in the configurator. Not included in the item name or description.")
-        labels = [f"{opt.get('code')} - {opt.get('name')}" for opt in choices]
-        picked = st.selectbox(
-            "Option",
-            labels,
-            key=f"contents_pick_{cat}_{field_name}",
-        )
-        picked_opt = choices[labels.index(picked)]
+
+    default = dropdowns.index("Package") if "Package" in dropdowns else 0
+    field_name = st.selectbox(
+        "Field",
+        dropdowns,
+        index=default,
+        key=f"selector_info_field_{cat}",
+    )
+    options = [
+        opt for opt in fields[field_name]["options"]
+        if isinstance(opt, dict) and opt.get("type") != "text" and str(opt.get("code") or "").strip()
+    ]
+    if not options:
+        st.info("This field has no options yet.")
+        return
+
+    # Long option lists stay on one editor so this page does not mount dozens of text areas.
+    if len(options) > 8:
+        labels = [f"{opt.get('code')} - {opt.get('name')}" for opt in options]
+        picked = st.selectbox("Option", labels, key=f"selector_info_opt_{cat}_{field_name}")
+        options = [options[labels.index(picked)]]
+
+    for opt in options:
+        label = f"{opt.get('code')} - {opt.get('name')}"
         note = st.text_area(
-            "Contents",
-            value=picked_opt.get("contents") or "",
-            key=f"contents_note_{cat}_{field_name}_{picked_opt.get('code')}",
-            height=140,
+            label,
+            value=opt.get("contents") or "",
+            key=f"selector_info_{cat}_{field_name}_{opt.get('code')}",
+            height=180,
         )
-        if note.strip() or "contents" in picked_opt:
-            picked_opt["contents"] = note
+        if note != (opt.get("contents") or ""):
+            opt["contents"] = note
 
 
 # ==================================================
@@ -207,6 +237,17 @@ def home():
             font-size: 13px;
             line-height: 1.45;
             white-space: pre-wrap;
+        }
+        .contents-note-list {
+            margin: 0;
+            padding-left: 18px;
+            color: #f3f4f6;
+            font-weight: 500;
+            font-size: 13px;
+            line-height: 1.45;
+        }
+        .contents-note-list li {
+            margin: 0 0 2px 0;
         }
         </style>
     """, unsafe_allow_html=True)
@@ -738,6 +779,7 @@ def admin():
 
     admin_sections = [
         "🛠️ Fields Configuration",
+        "📝 Selector Info",
         "🎁 Extras Management",
         "⚙️ Category Settings",
         "📊 Export Matrix",
@@ -911,11 +953,14 @@ def admin():
                         }
                     )
                     fields[field_for_options]["options"] = merge_editor_records(opts, edited_df.to_dict("records"))
-                    _edit_option_contents(cat, field_for_options, fields[field_for_options]["options"])
             else:
                 st.caption("Choose a tool above to reorder, rename, or edit field options.")
         else:
             st.info("No fields configured yet. Add a field above to get started.")
+
+    # ---------- SELECTOR INFO ----------
+    elif section == "📝 Selector Info":
+        _selector_info_section(cat, inv[cat])
 
     # ---------- EXTRAS MANAGEMENT ----------
     elif section == "🎁 Extras Management":

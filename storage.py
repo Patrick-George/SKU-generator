@@ -43,13 +43,60 @@ def _copied_options(field):
     return options
 
 
+def _package_contents(length, extras=()):
+    """Selector note for one blast package. Shown under the dropdown only."""
+    lines = [
+        "Blast Machine (incl. Screen + Cover)",
+        "Remote Control Valve",
+        "Moisture Separator",
+        "Abrasive Metering Valve",
+        "Threaded Pot Coupling",
+        "Four-Jaw Inlet Coupling",
+        "Dead Man Handle",
+        f"Twin Hose ({length}) + Fittings",
+        f'Blast Hose 1-1/4" ({length})',
+        "Blast Hose Coupling",
+        "Nozzle Holder Nylon (NHP2)",
+        "Nozzle #5 (8 mm) / #6 (9.5 mm)",
+        "Whip Check",
+        "R Clip (only for cast iron hose coupling)",
+        *extras,
+    ]
+    return "\n".join(lines)
+
+
+_PPE = ("+ Blast Gloves", "+ Blast Suit", "+ Blast Helmet")
+
+# Selector notes for Blast Machine Packages. Not copied into the item name or description.
+PACKAGE_DETAILS = {
+    "2A": _package_contents("20m"),
+    "2B": _package_contents("40m"),
+    "3A": _package_contents("20m", _PPE),
+    "3B": _package_contents("40m", _PPE),
+    "4A": _package_contents("20m", (
+        "Blast Gloves",
+        "Blast Suit",
+        "Blast Helmet",
+        "+ Breathing Air Filter Single BL 20",
+        '+ Breathing Hose 3/8" (20m) + Fittings',
+    )),
+    "4B": _package_contents("40m", (
+        "Blast Gloves",
+        "Blast Suit",
+        "Blast Helmet",
+        "+ Breathing Air Filter Single BL 20",
+        '+ Breathing Hose 3/8" (40m) + Fittings',
+    )),
+}
+
+
 def _build_blast_machine_packages(blast_machine):
     """Category with capacity and certification copied from Blast Machine when present."""
     source_fields = {}
     if isinstance(blast_machine, dict):
         source_fields = blast_machine.get("fields") or {}
 
-    package_codes = ("2A", "2B", "3A", "3B")
+    package_codes = ("2A", "2B", "3A", "3B", "4A", "4B")
     return {
         "fields": {
             "Capacity": {"order": 1, "options": _copied_options(source_fields.get("Capacity"))},
@@ -82,7 +129,7 @@ def _build_blast_machine_packages(blast_machine):
                         "tally_name": code,
                         "description": f"Package {code}",
                         "order": index,
-                        "contents": "",
+                        "contents": PACKAGE_DETAILS.get(code, ""),
                     }
                     for index, code in enumerate(package_codes, start=1)
                 ],
@@ -158,6 +205,19 @@ class GithubStorage:
             except Exception:
                 pass
 
+        # One-time fill of package selector notes. Later edits in admin are kept.
+        if self._ensure_package_details(data):
+            try:
+                self.save(data)
+            except Exception:
+                pass
+
+        if self._ensure_package_details_v2(data):
+            try:
+                self.save(data)
+            except Exception:
+                pass
+
         return data
 
     @staticmethod
@@ -224,6 +284,66 @@ class GithubStorage:
             )
 
         data["blast_machine_packages_seeded"] = True
+        return True
+
+    @staticmethod
+    def _ensure_package_details(data):
+        """Fill empty 3A/3B selector notes once. Returns True if data changed."""
+        if data.get("package_details_seeded"):
+            return False
+
+        inventory = data.get("inventory") or {}
+        category = inventory.get("Blast Machine Packages") if isinstance(inventory, dict) else None
+        if isinstance(category, dict):
+            options = ((category.get("fields") or {}).get("Package") or {}).get("options") or []
+            for opt in options:
+                if not isinstance(opt, dict):
+                    continue
+                code = str(opt.get("code") or "").strip()
+                if code in PACKAGE_DETAILS and not str(opt.get("contents") or "").strip():
+                    opt["contents"] = PACKAGE_DETAILS[code]
+
+        data["package_details_seeded"] = True
+        return True
+
+    @staticmethod
+    def _ensure_package_details_v2(data):
+        """Fill 2A/2B notes and add 4A/4B once. Returns True if data changed."""
+        if data.get("package_details_v2_seeded"):
+            return False
+
+        inventory = data.get("inventory") or {}
+        category = inventory.get("Blast Machine Packages") if isinstance(inventory, dict) else None
+        if isinstance(category, dict):
+            package = (category.get("fields") or {}).get("Package")
+            if isinstance(package, dict):
+                options = package.setdefault("options", [])
+                by_code = {
+                    str(opt.get("code") or "").strip(): opt
+                    for opt in options
+                    if isinstance(opt, dict)
+                }
+                next_order = 1 + max(
+                    (int(opt.get("order") or 0) for opt in options if isinstance(opt, dict)),
+                    default=0,
+                )
+                for code in ("2A", "2B", "3A", "3B", "4A", "4B"):
+                    text = PACKAGE_DETAILS.get(code, "")
+                    opt = by_code.get(code)
+                    if opt is None:
+                        options.append({
+                            "code": code,
+                            "name": f"Package {code}",
+                            "tally_name": code,
+                            "description": f"Package {code}",
+                            "order": next_order,
+                            "contents": text,
+                        })
+                        next_order += 1
+                    elif text and not str(opt.get("contents") or "").strip():
+                        opt["contents"] = text
+
+        data["package_details_v2_seeded"] = True
         return True
 
     def save(self, data):
