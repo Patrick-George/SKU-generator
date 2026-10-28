@@ -67,6 +67,9 @@ def _package_contents(length, extras=()):
 
 _PPE = ("+ Blast Gloves", "+ Blast Suit", "+ Blast Helmet")
 
+# Short ids stay 2A/2B/… The SKU segment and item-name tally are PK + that id.
+PACKAGE_SHORT_CODES = ("2A", "2B", "3A", "3B", "4A", "4B")
+
 # Selector notes for Blast Machine Packages. Not copied into the item name or description.
 PACKAGE_DETAILS = {
     "2A": _package_contents("20m"),
@@ -96,7 +99,6 @@ def _build_blast_machine_packages(blast_machine):
     if isinstance(blast_machine, dict):
         source_fields = blast_machine.get("fields") or {}
 
-    package_codes = ("2A", "2B", "3A", "3B", "4A", "4B")
     return {
         "fields": {
             "Capacity": {"order": 1, "options": _copied_options(source_fields.get("Capacity"))},
@@ -124,14 +126,14 @@ def _build_blast_machine_packages(blast_machine):
                 "order": 4,
                 "options": [
                     {
-                        "code": code,
-                        "name": f"Package {code}",
-                        "tally_name": code,
-                        "description": f"Package {code}",
+                        "code": f"PK{short}",
+                        "name": f"Package {short}",
+                        "tally_name": f"PK{short}",
+                        "description": f"Package {short}",
                         "order": index,
-                        "contents": PACKAGE_DETAILS.get(code, ""),
+                        "contents": PACKAGE_DETAILS.get(short, ""),
                     }
-                    for index, code in enumerate(package_codes, start=1)
+                    for index, short in enumerate(PACKAGE_SHORT_CODES, start=1)
                 ],
             },
         },
@@ -213,6 +215,12 @@ class GithubStorage:
                 pass
 
         if self._ensure_package_details_v2(data):
+            try:
+                self.save(data)
+            except Exception:
+                pass
+
+        if self._ensure_package_pk_codes(data):
             try:
                 self.save(data)
             except Exception:
@@ -300,8 +308,9 @@ class GithubStorage:
                 if not isinstance(opt, dict):
                     continue
                 code = str(opt.get("code") or "").strip()
-                if code in PACKAGE_DETAILS and not str(opt.get("contents") or "").strip():
-                    opt["contents"] = PACKAGE_DETAILS[code]
+                short = code[2:] if code.startswith("PK") else code
+                if short in PACKAGE_DETAILS and not str(opt.get("contents") or "").strip():
+                    opt["contents"] = PACKAGE_DETAILS[short]
 
         data["package_details_seeded"] = True
         return True
@@ -327,15 +336,16 @@ class GithubStorage:
                     (int(opt.get("order") or 0) for opt in options if isinstance(opt, dict)),
                     default=0,
                 )
-                for code in ("2A", "2B", "3A", "3B", "4A", "4B"):
-                    text = PACKAGE_DETAILS.get(code, "")
-                    opt = by_code.get(code)
+                for short in PACKAGE_SHORT_CODES:
+                    text = PACKAGE_DETAILS.get(short, "")
+                    sku_code = f"PK{short}"
+                    opt = by_code.get(sku_code) or by_code.get(short)
                     if opt is None:
                         options.append({
-                            "code": code,
-                            "name": f"Package {code}",
-                            "tally_name": code,
-                            "description": f"Package {code}",
+                            "code": sku_code,
+                            "name": f"Package {short}",
+                            "tally_name": sku_code,
+                            "description": f"Package {short}",
                             "order": next_order,
                             "contents": text,
                         })
@@ -344,6 +354,43 @@ class GithubStorage:
                         opt["contents"] = text
 
         data["package_details_v2_seeded"] = True
+        return True
+
+    @staticmethod
+    def _ensure_package_pk_codes(data):
+        """Rename package codes 2A -> PK2A and match the item-name tally. Once."""
+        if data.get("package_pk_codes_seeded"):
+            return False
+
+        inventory = data.get("inventory") or {}
+        category = inventory.get("Blast Machine Packages") if isinstance(inventory, dict) else None
+        if isinstance(category, dict):
+            package = (category.get("fields") or {}).get("Package")
+            if isinstance(package, dict):
+                options = package.get("options") or []
+                by_code = {
+                    str(opt.get("code") or "").strip(): opt
+                    for opt in options
+                    if isinstance(opt, dict)
+                }
+                for short in PACKAGE_SHORT_CODES:
+                    new_code = f"PK{short}"
+                    short_opt = by_code.get(short)
+                    pk_opt = by_code.get(new_code)
+                    target = pk_opt
+                    if short_opt is not None and pk_opt is None:
+                        short_opt["code"] = new_code
+                        by_code[new_code] = short_opt
+                        target = short_opt
+                    elif short_opt is not None:
+                        target = short_opt if pk_opt is None else pk_opt
+                    if target is None:
+                        continue
+                    tally = str(target.get("tally_name") or "").strip()
+                    if tally in ("", short, new_code):
+                        target["tally_name"] = new_code
+
+        data["package_pk_codes_seeded"] = True
         return True
 
     def save(self, data):
